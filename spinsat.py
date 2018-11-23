@@ -5,7 +5,6 @@ import random
 
 
 
-
 class clause:
 # input:
 #     string                       name
@@ -110,9 +109,12 @@ class variable:
         self.val = None
 
 
-
-
         
+
+
+
+
+# Braunstein survey propogation paper Fig. 3
 x1 = variable(1)
 x2 = variable(2)
 x3 = variable(3)
@@ -121,11 +123,6 @@ x5 = variable(5)
 x6 = variable(6)
 x7 = variable(7)
 x8 = variable(8)
-
-c_z = clause('z', [x1, x2, x3, x4, x5, x6, x7], [-1,-1, -1, -1, -1, -1, -1])
-
-
-# Braunstein survey propogation paper Fig. 3
 c_a = clause('a', [x1], [1])
 c_b = clause('b', [x2], [-1])
 c_c = clause('c', [x1, x2, x3], [-1, 1, 1])
@@ -135,42 +132,90 @@ c_f = clause('f', [x4], [1])
 c_g = clause('g', [x4, x7], [1, -1])
 c_h = clause('h', [x5, x8], [1, 1])
 c_i = clause('i', [x5, x6], [-1, 1])
-
 fig3 = [c_a, c_b, c_c, c_d, c_e, c_f, c_g, c_h, c_i]
 
-print 'clause z SAT-table: \n', c_z.generateSATtable(), '\n'
-for clause in fig3:
-    print clause.info()
+c_z = clause('z', [x1, x2, x3, x4, x5, x6, x7], [-1,-1, -1, -1, -1, -1, -1])
+    
+def wpUpdate(edges, varWarns):
+    cavFields = {}
+    clsWarns = {}
+    
+    for edge in edges:
+        i = edge[1]
+        a = edge[0]
+        print 'current edge (a) (i): ', edge[0].name, edge[1].name
 
+        # find j element of V(a)\i
+        for edge in edges:
+           
+             
+            if edge[0] == a and edge[1] != i:
+                print 'var (j) with matching clause to a: ',edge[0].name, edge[1].name
+                j = edge[1]
+                posEdgeVarMsgSum = 0
+                negEdgeVarMsgSum = 0
 
-def wpUpdate(edge):
-    print edge[0].name, edge[1].name
-     
+                # find b element of V(j)\a
+                for edge in edges:
+                   
+                    # compute cavity fields h_j -> a
+                    if edge[1] == j and edge[0] != a:
+                       
+                        b = edge[0]
+                        edgeVal = b.getEdge(j)
+                        print 'clause (b) with matching var to j: ', edge[0].name, edge[1].name
+                        print 'edgeVal: ',edgeVal
+                        if edgeVal == -1:
+                            posEdgeVarMsgSum += varWarns[(b,j)]
+                            print 'posEdgeVarMsg: ', varWarns[(b,j)]
+                            
+                        else:
+                            print  'negEdgeVarMsg: ', varWarns[(b,j)]
+                            negEdgeVarMsgSum += varWarns[(b,j)]
+                print 'sum of positive edge messages: ', posEdgeVarMsgSum
+                print 'sum of negative edge mesages: ', negEdgeVarMsgSum
+                cavFields[(j,a)] = posEdgeVarMsgSum - negEdgeVarMsgSum
+    
+    for cavField in cavFields:
+        print cavField[0].name, cavField[1].name, cavFields[cavField]    
+                # for edge in edges:
+                #     if edge[1] == j
+                    
+                # cavFields[ 
+                
+      #  print edge[0].name, edge[1].name
+        
+      #  print edge[0].name, edge[1].name
+        
     
 def warnProp(clauses):
-    varMsgs = {}
+    varWarns = {}
     vars = []
     t = 0
     
-    for clause in clauses:
-        
-        for var in clause.vars:
-            varMsgs[(clause, var)] = random.randint(0,1)
+    for a in clauses:
+        # generate 
+        for i in a.vars:
+            varWarns[(a, i)] = random.randint(0,1)
     
-    for i in varMsgs:
-        print i[0].name, i[1].name, varMsgs[i]
+    for varWarn in varWarns:
+        print varWarn[0].name, varWarn[1].name, varWarns[varWarn]
       
-    edges = varMsgs.keys()
+    edges = varWarns.keys()
     
-    while t < 20:
+    while t < 1:
         t += 1
         print t
         random.shuffle(edges)
-
-        for edge in edges:
-            wpUpdate(edge)
+        wpUpdate(edges, varWarns)
             
 
 
+print 'clause z SAT-table: \n', c_z.generateSATtable(), '\n'
+
+for clause in fig3:
+    print clause.info()
     
+print '\n'
+
 print warnProp(fig3)
