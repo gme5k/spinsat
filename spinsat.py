@@ -4,7 +4,6 @@ import random
 
 
 
-
 class clause:
 # input:
 #     string                       name
@@ -72,7 +71,6 @@ class clause:
             raise ValueError('At least one of the variables has no value.')
 
         
-
     def generateSATtable(self):
     # tries all combinations of var. values and prints sat. table
         
@@ -98,6 +96,7 @@ class clause:
             print entry    
         return None 
 
+
     
     
 class variable:
@@ -109,33 +108,8 @@ class variable:
         self.val = None
 
 
+
         
-
-
-
-
-# Braunstein survey propogation paper Fig. 3
-x1 = variable(1)
-x2 = variable(2)
-x3 = variable(3)
-x4 = variable(4)
-x5 = variable(5)
-x6 = variable(6)
-x7 = variable(7)
-x8 = variable(8)
-c_a = clause('a', [x1], [1])
-c_b = clause('b', [x2], [-1])
-c_c = clause('c', [x1, x2, x3], [-1, 1, 1])
-c_d = clause('d', [x3, x4], [-1, 1])
-c_e = clause('e', [x3, x5], [1, 1])
-c_f = clause('f', [x4], [1])
-c_g = clause('g', [x4, x7], [1, -1])
-c_h = clause('h', [x5, x8], [1, 1])
-c_i = clause('i', [x5, x6], [-1, 1])
-fig3 = [c_a, c_b, c_c, c_d, c_e, c_f, c_g, c_h, c_i]
-
-c_z = clause('z', [x1, x2, x3, x4, x5, x6, x7], [-1,-1, -1, -1, -1, -1, -1])
-    
 def wpUpdate(edges, varWarns):
     cavFields = {}
     clsWarns = {}
@@ -186,7 +160,9 @@ def wpUpdate(edges, varWarns):
       #  print edge[0].name, edge[1].name
         
       #  print edge[0].name, edge[1].name
-        
+
+
+      
     
 def warnProp(clauses):
     varWarns = {}
@@ -211,11 +187,34 @@ def warnProp(clauses):
             
 
 
+        
+# Braunstein survey propogation paper Fig. 3
+x1 = variable(1)
+x2 = variable(2)
+x3 = variable(3)
+x4 = variable(4)
+x5 = variable(5)
+x6 = variable(6)
+x7 = variable(7)
+x8 = variable(8)
+c_a = clause('a', [x1], [1])
+c_b = clause('b', [x2], [-1])
+c_c = clause('c', [x1, x2, x3], [-1, 1, 1])
+c_d = clause('d', [x3, x4], [-1, 1])
+c_e = clause('e', [x3, x5], [1, 1])
+c_f = clause('f', [x4], [1])
+c_g = clause('g', [x4, x7], [1, -1])
+c_h = clause('h', [x5, x8], [1, 1])
+c_i = clause('i', [x5, x6], [-1, 1])
+fig3 = [c_a, c_b, c_c, c_d, c_e, c_f, c_g, c_h, c_i]
+
+c_z = clause('z', [x1, x2, x3, x4, x5, x6, x7], [-1,-1, -1, -1, -1, -1, -1])
+
+
+
+
 print 'clause z SAT-table: \n', c_z.generateSATtable(), '\n'
 
 for clause in fig3:
     print clause.info()
-    
-print '\n'
-
-print warnProp(fig3)
+print '\n', warnProp(fig3)
