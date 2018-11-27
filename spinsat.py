@@ -30,6 +30,7 @@ class clause:
             
     def info(self):
         info = []
+        
         print self.name
         print 'var, edge, val'
         
@@ -93,8 +94,10 @@ class clause:
         print '0 = SAT, 2 = UNSAT'
         
         for entry in table:
-            print entry    
-        return None 
+            
+            print entry
+            
+        return None
 
 
     
@@ -108,6 +111,35 @@ class variable:
         self.val = None
 
 
+def wid(fig, tmax):
+    varsDone = []
+    locFields = {}
+    varWarns = warnProp(fig, tmax)
+    edges = varWarns.keys()
+    if varWarns == 'UN-CONVERGED':
+        return 'UN-CONVERGED'
+    else:
+        for i in varWarns:
+            print i[0].name, i[1].name, varWarns[i]
+
+        for edge in edges:
+            locField = 0
+            i = edge[1]
+            a = edge[0]
+            if i not in varsDone:
+                varsDone.append(i)
+                print 'curVar: ', i.name
+                for edge in edges:
+                    if edge[1] == i and edge[0] != a:
+                        b = edge[0]
+                        print '    curClause', b.name
+                        print '   locField',  b.getEdge(i) * varWarns[(b, i)]
+                        locField += b.getEdge(i) * varWarns[(b, i)]
+                        print 'cur locfield: ', locField
+                locFields[i] = -1 * locField
+        print 'locFields'
+        for i in locFields:
+            print i.name, locFields[i]
 
         
 def wpUpdate(edges, varWarns, a, i):
@@ -156,25 +188,27 @@ def wpUpdate(edges, varWarns, a, i):
 
             cavFields[(j,a)] = posEdgeVarWarnSum - negEdgeVarWarnSum
             newVarWarn *=  theta(cavFields[(j,a)] * a.getEdge(j))
-    
+        
             print '    sum of positive edge warnings: ', posEdgeVarWarnSum
             print '    sum of negative edge warnings: ', negEdgeVarWarnSum
             print '    resulting cavity field: ', cavFields[(j,a)]
-            print '    current resulting cavity fields:'
-            print 'variable (j), clause (a), cavity field (h_j -> a)'
-
+            print '    current resulting cavity fields: \n'
+            print '    variable (j), clause (a), cavity field (h_j -> a), J^a_j'
+            
             for cavField in cavFields:
-                print '   ', cavField[0].name, cavField[1].name, cavFields[cavField]    
-            print '    current newVarWarn: ', newVarWarn
-    return newVarWarn
+                
+                print '   ', cavField[0].name, cavField[1].name, cavFields[cavField], cavField[1].getEdge(cavField[0])
+                
+            print '\n    current newVarWarn: ', newVarWarn
+            
     print 'resulting newVarWarn: ', newVarWarn, '\n'
-
-
-
+         
+    return newVarWarn
+ 
 
    
     
-def warnProp(clauses):
+def warnProp(clauses, tmax):
     varWarns = {}
     oldVarWarns = {}
     vars = []
@@ -186,49 +220,66 @@ def warnProp(clauses):
 
         for i in a.vars:
             varWarns[(a, i)] = random.randint(0,1)
+            
     print 'initial varWarns: \nclause (a), variable (i), warning (u_a -> i):'
     
     for varWarn in varWarns:
+        
         print varWarn[0].name, varWarn[1].name, varWarns[varWarn]
       
     edges = varWarns.keys()
     
-    while t < 10:
+    while t < tmax:
         t += 1
+        
         print '\nt = ', t
+        
         random.shuffle(edges)
+        
         print '\nedges order: '
 
         for edge in edges:
+            
             print edge[0].name, edge[1].name
+            
         print '\n'
 
         for edge in edges:
             i = edge[1]
             a = edge[0]
+            
             print 'current edge (a) (i): ', edge[0].name, edge[1].name
             print 'varWarn: ', varWarns[(a,i)]
+            
             oldVarWarns[(a,i)] = varWarns[(a,i)]
             varWarns[(a,i)] = wpUpdate(edges, varWarns, a, i)
 
         convergence = 1
+        
+        print 'oldVarWarns, varWarns'
         
         for varWarn in varWarns:
             
             print oldVarWarns[varWarn], varWarns[varWarn]
             
             if varWarns[varWarn] != oldVarWarns[varWarn]:
+                
                 print 'nope'
+                
                 convergence = 0
                 
         if convergence == 1:
-            print 'hallelujah'
-            break
+            
+            print 'converged in  t = ', t
+            
+            return varWarns
+        
+        elif t == tmax:
+            return 'UNCONVERGED'
 
             
 
 
-        
 def theta(x):
     if x <= 0:
         return 0
@@ -267,4 +318,4 @@ print 'clause z SAT-table: \n', c_z.generateSATtable(), '\n'
 print 'fig. 3: '
 for clause in fig3:
     print clause.info(), '\n'
-print '\n', warnProp(fig3)
+print '\n', wid(fig3, 100)
