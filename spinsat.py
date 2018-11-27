@@ -110,81 +110,73 @@ class variable:
 
 
         
-def wpUpdate(edges, varWarns):
+def wpUpdate(edges, varWarns, a, i):
+    newVarWarn = 1
     cavFields = {}
-    print '\nedges order: '
     
+    # find (j) element of V(a)\i, i.e. the other variables attached to (a)
     for edge in edges:
-        print edge[0].name, edge[1].name
-    print '\n'
-        
-    for edge in edges:
-        i = edge[1]
-        a = edge[0]
-        print 'current edge (a) (i): ', edge[0].name, edge[1].name
-        print 'varWarn: ', varWarns[(a,i)] 
-        newVarWarn = 1
-        
-        # find (j) element of V(a)\i, i.e. the other variables attached to (a)
-        for edge in edges:
+
+        # if any (j) exists, set sums of warnings u_b -> j to 0
+        if edge[0] == a and edge[1] != i:
+
+            print '    var (j) with matching clause to (a): ',edge[0].name,\
+                edge[1].name
             
-            # if any (j) exists, set sums of warnings to 0
-            if edge[0] == a and edge[1] != i:
-                print '    var (j) with matching clause to (a): ',edge[0].name,\
-                    edge[1].name
-                j = edge[1]
-                posEdgeVarWarnSum = 0
-                negEdgeVarWarnSum = 0
+            j = edge[1]
+            posEdgeVarWarnSum = 0
+            negEdgeVarWarnSum = 0
+            
+            # compute cavity fields h_j -> a, messages from variables to clauses
+            for edge in edges:
 
-                # find (b) element of V(j)\a, i.e. the other clauses besides
-                # (a) attached to (j)
-                for edge in edges:
-                   
-                    # compute cavity fields h_j -> a, messages from variables
-                    # to clauses
-                    if edge[1] == j and edge[0] != a:
-                       
-                        b = edge[0]
-                        edgeVal = b.getEdge(j)
-                        print '        clause (b) with matching var to (j): ',\
-                            edge[0].name, edge[1].name
+                # find (b) element of V(j)\a, i.e. the other clauses besides (a)
+                # attached to (j)
+                if edge[1] == j and edge[0] != a:
+                    b = edge[0]
+                    edgeVal = b.getEdge(j)
+                    
+                    print '        clause (b) with matching var to (j): ',\
+                        edge[0].name, edge[1].name
 
-                        # if edge value = -1 (solid line), add u_a -> i to
-                        # sum of warnings from un-negated variables
-                        if edgeVal == -1:
-                            posEdgeVarWarnSum += varWarns[(b,j)]
-                            print '        edgeVal: ', edgeVal, ' posEdgeVarWarn: ', varWarns[(b,j)]
+                    # if edge value = -1 (solid line), add u_b -> j to
+                    # sum of warnings from un-negated variables
+                    if edgeVal == -1:
+                        posEdgeVarWarnSum += varWarns[(b,j)]
+                        
+                        print '        edgeVal: ', edgeVal, ' posEdgeVarWarn: ', varWarns[(b,j)]
 
-                        # else if edge value = 1 (dotted line), add u_a > i to
-                        # sum of warnings from negated variables
-                        elif edgeVal == 1:
-                            print  '        edgeVal: ', edgeVal, 'negEdgeVarWarn: ', varWarns[(b,j)]
-                            negEdgeVarWarnSum += varWarns[(b,j)]
-              
-                cavFields[(j,a)] = posEdgeVarWarnSum - negEdgeVarWarnSum
-                newVarWarn *=  theta(cavFields[(j,a)] * a.getEdge(j))
-                varWarns[(a,i)] = newVarWarn
-                print '    sum of positive edge warnings: ', posEdgeVarWarnSum
-                print '    sum of negative edge warnings: ', negEdgeVarWarnSum
-                print '    resulting cavity field: ', cavFields[(j,a)]
-                print '    current resulting cavity fields:\n    variable (j), clause (a), cavity field (h_j -> a)'
-                
-                for cavField in cavFields:
-                    print '   ', cavField[0].name, cavField[1].name, cavFields[cavField]    
-                print '    current newVarWarn: ', newVarWarn
-        print 'resulting newVarWarn: ', newVarWarn, '\n'
-        print 'current varWarns:\nclause (a), variable (i), warning (u_a -> i)'
-        
-        for varWarn in varWarns:
-            print varWarn[0].name, varWarn[1].name, varWarns[varWarn]
+                    # else if edge value = 1 (dotted line), add u_b > j to
+                    # sum of warnings from negated variables
+                    elif edgeVal == 1:
+                        
+                        print  '        edgeVal: ', edgeVal, 'negEdgeVarWarn: ', varWarns[(b,j)]
+                        
+                        negEdgeVarWarnSum += varWarns[(b,j)]
 
+            cavFields[(j,a)] = posEdgeVarWarnSum - negEdgeVarWarnSum
+            newVarWarn *=  theta(cavFields[(j,a)] * a.getEdge(j))
     
-              
+            print '    sum of positive edge warnings: ', posEdgeVarWarnSum
+            print '    sum of negative edge warnings: ', negEdgeVarWarnSum
+            print '    resulting cavity field: ', cavFields[(j,a)]
+            print '    current resulting cavity fields:'
+            print 'variable (j), clause (a), cavity field (h_j -> a)'
+
+            for cavField in cavFields:
+                print '   ', cavField[0].name, cavField[1].name, cavFields[cavField]    
+            print '    current newVarWarn: ', newVarWarn
+    return newVarWarn
+    print 'resulting newVarWarn: ', newVarWarn, '\n'
+
+
+
 
    
     
 def warnProp(clauses):
     varWarns = {}
+    oldVarWarns = {}
     vars = []
     t = 0
 
@@ -201,11 +193,38 @@ def warnProp(clauses):
       
     edges = varWarns.keys()
     
-    while t < 1000:
+    while t < 10:
         t += 1
         print '\nt = ', t
         random.shuffle(edges)
-        wpUpdate(edges, varWarns)
+        print '\nedges order: '
+
+        for edge in edges:
+            print edge[0].name, edge[1].name
+        print '\n'
+
+        for edge in edges:
+            i = edge[1]
+            a = edge[0]
+            print 'current edge (a) (i): ', edge[0].name, edge[1].name
+            print 'varWarn: ', varWarns[(a,i)]
+            oldVarWarns[(a,i)] = varWarns[(a,i)]
+            varWarns[(a,i)] = wpUpdate(edges, varWarns, a, i)
+
+        convergence = 1
+        
+        for varWarn in varWarns:
+            
+            print oldVarWarns[varWarn], varWarns[varWarn]
+            
+            if varWarns[varWarn] != oldVarWarns[varWarn]:
+                print 'nope'
+                convergence = 0
+                
+        if convergence == 1:
+            print 'hallelujah'
+            break
+
             
 
 
@@ -245,7 +264,7 @@ c_z = clause('z', [x1, x2, x3, x4, x5, x6, x7], [-1,-1, -1, -1, -1, -1, -1])
 
 
 print 'clause z SAT-table: \n', c_z.generateSATtable(), '\n'
-print 'fig. 3:\n '
+print 'fig. 3: '
 for clause in fig3:
     print clause.info(), '\n'
 print '\n', warnProp(fig3)
