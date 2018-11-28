@@ -49,27 +49,35 @@ class clause:
         # products of edge values {-1, 1}, and variable values {-1, 1}
         edgeValProducts = []
         
-        # works if variables have values
-        try:
             
             # calculate edge * value
-            for var in self.vars:
-                edgeValProducts.append(var.value * self.getEdge(var))
-            sat = 1
+        empty = True 
+        for var in self.vars:
+            print var.val
+            if var.val != None:
+                empty = False
+                edgeValProducts.append(var.val * self.getEdge(var))
+       
 
-            # sat = 0 if at least one variable satisfies clause, else sat = 2
-            # [mezard K-SAT paper eq. 5]
+        # sat = 0 if at least one variable satisfies clause, else sat = 2
+        # [mezard K-SAT paper eq. 5]
+        sat = 1
+        print empty
+        if empty == False:
             for i in edgeValProducts:
                 sat *= (1 + i) / 2.0
+              #  print sat
 
                 # if one variable satisfies, do not calculate others
                 if sat == 0:
                     break
-               
+            print 'sat: ', int(2 * sat)
             return int(2 * sat)
         
-        except:
+        else:
             return 2
+
+       
 
         
     def generateSATtable(self):
@@ -206,6 +214,7 @@ def wid(fig, tmax):
 
         # check for local fields, set variable values according to local fields
         locFieldPresent = 0
+        print 'variables after taking into account local fields: '
         for var in varsDone:
                 
             if locFields[var] > 0:
@@ -214,12 +223,13 @@ def wid(fig, tmax):
 
             elif locFields[var] < 0:
                 locFieldPresent = 1
-                var.val = 0
-
+                var.val = -1
+                
             else:
                 pass
-            
-        print 'checkSat: '
+       
+            print 'var: ', var.name, 'val: ', var.val
+        print '\ncheckSat: '
 
         # remove satisfied stuff
         if locFieldPresent == 1:
@@ -228,27 +238,35 @@ def wid(fig, tmax):
             for clause in fig:
 
                 print clause.name, clause.checkSAT()
-
+                print clause.generateSATtable()
                 if clause.checkSAT() == 0:
                     fig.remove(clause)
-
-            # remove variables
+                    print 'removed clause: ', clause.name
+                
+                # elif clause.checkSAT() == 2:
+                #     for var in clause.vars:
+                #         print 'clause: ', clause.name, 'variable: ', var.name,' varVal: ', var.val
+                #         if var.val != None:
+                #             print 'variable', var.name, 'removed from', clause.name
+                #             clause.vars.remove(var)
+               
+            print '\n'    
             for clause in fig:
-                for var in clause.vars:
-                    print 'clause', clause.name, 'varVal', var.val
-                    if var.val != None:
-                         print 'variable', var.name, 'removed from', clause.name
-                         clause.vars.remove(var)
-                       
-        # else:
-        #     for var in varsDone:
-                
-
-                
-        print 'clauses left'
+                if clause.checkSAT() == 2:
+                    for var in clause.vars:
+                        print 'clause: ', clause.name, 'variable: ', var.name,' varVal: ', var.val
+                        if var.val != None:
+                            print 'variable', var.name, 'removed from', clause.name
+                            clause.vars.remove(var)
+               
+            print '\n'
+            
+            # remove variables
+     
+        print '\nclauses left'
         for clause in fig:
             print clause.name
-        print 'variable values: '
+        print '\nvariable values: '
         for var in varsDone:
             print var.name, var.val
                 
@@ -269,8 +287,8 @@ def wpUpdate(edges, varWarns, a, i):
         # if any (j) exists, set sums of warnings u_b -> j to 0
         if edge[0] == a and edge[1] != i:
 
-            print '    var (j) with matching clause to (a): ',edge[0].name,\
-                edge[1].name
+#           print '    var (j) with matching clause to (a): ',edge[0].name,\
+#                edge[1].name
             
             j = edge[1]
             posEdgeVarWarnSum = 0
@@ -285,23 +303,23 @@ def wpUpdate(edges, varWarns, a, i):
                     b = edge[0]
                     edgeVal = b.getEdge(j)
                     
-                    print '        clause (b) with matching var to (j): ',\
-                        edge[0].name, edge[1].name
+#                    print '        clause (b) with matching var to (j): ',\
+#                       edge[0].name, edge[1].name
 
                     # if edge value = -1 (solid line), add u_b -> j to
                     # sum of warnings from un-negated variables
                     if edgeVal == -1:
                         posEdgeVarWarnSum += varWarns[(b,j)]
                         
-                        print '        edgeVal: ', edgeVal, ' posEdgeVarWarn: '\
-                            , varWarns[(b,j)]
+#                        print '        edgeVal: ', edgeVal, ' posEdgeVarWarn: '\
+#                            , varWarns[(b,j)]
 
                     # else if edge value = 1 (dotted line), add u_b > j to
                     # sum of warnings from negated variables
                     elif edgeVal == 1:
                         
-                        print  '        edgeVal: ', edgeVal, 'negEdgeVarWarn: ',\
-                            varWarns[(b,j)]
+#                        print  '        edgeVal: ', edgeVal, 'negEdgeVarWarn: ',\
+#                            varWarns[(b,j)]
                         
                         negEdgeVarWarnSum += varWarns[(b,j)]
                         
@@ -309,17 +327,17 @@ def wpUpdate(edges, varWarns, a, i):
             cavFields[(j,a)] = posEdgeVarWarnSum - negEdgeVarWarnSum
             newVarWarn *=  theta(cavFields[(j,a)] * a.getEdge(j))
         
-            print '    sum of positive edge warnings: ', posEdgeVarWarnSum
-            print '    sum of negative edge warnings: ', negEdgeVarWarnSum
-            print '    resulting cavity field: ', cavFields[(j,a)]
-            print '    current resulting cavity fields: \n'
-            print '    variable (j), clause (a), cavity field (h_j -> a), J^a_j'
-            for cavField in cavFields:
-                print '   ', cavField[0].name, cavField[1].name,\
-                    cavFields[cavField], cavField[1].getEdge(cavField[0])
-            print '\n    current newVarWarn: ', newVarWarn
+ #           print '    sum of positive edge warnings: ', posEdgeVarWarnSum
+ #           print '    sum of negative edge warnings: ', negEdgeVarWarnSum
+ #           print '    resulting cavity field: ', cavFields[(j,a)]
+ #           print '    current resulting cavity fields: \n'
+ #           print '    variable (j), clause (a), cavity field (h_j -> a), J^a_j'
+ #           for cavField in cavFields:
+ #               print '   ', cavField[0].name, cavField[1].name,\
+#                    cavFields[cavField], cavField[1].getEdge(cavField[0])
+ #           print '\n    current newVarWarn: ', newVarWarn
             
-    print 'resulting newVarWarn: ', newVarWarn, '\n'
+ #   print 'resulting newVarWarn: ', newVarWarn, '\n'
     
     return newVarWarn
  
@@ -352,17 +370,17 @@ def warnProp(clauses, tmax):
         random.shuffle(edges)
         
         print '\nt = ', t
-        print '\nedges order: '
-        for edge in edges:
-            print edge[0].name, edge[1].name
+#        print '\nedges order: '
+#        for edge in edges:
+#            print edge[0].name, edge[1].name
         print '\n'
 
         for edge in edges:
             i = edge[1]
             a = edge[0]
             
-            print 'current edge (a) (i): ', edge[0].name, edge[1].name
-            print 'varWarn: ', varWarns[(a,i)]
+#            print 'current edge (a) (i): ', edge[0].name, edge[1].name
+#            print 'varWarn: ', varWarns[(a,i)]
 
             # store old warnings in similar dictionary to varWarns
             oldVarWarns[(a,i)] = varWarns[(a,i)]
@@ -371,23 +389,23 @@ def warnProp(clauses, tmax):
             varWarns[(a,i)] = wpUpdate(edges, varWarns, a, i)
         convergence = 1
         
-        print 'oldVarWarns, varWarns'
+#        print 'oldVarWarns, varWarns'
 
         # check for convergence
         for varWarn in varWarns:
             
-            print oldVarWarns[varWarn], varWarns[varWarn]
+ #           print oldVarWarns[varWarn], varWarns[varWarn]
             
             if varWarns[varWarn] != oldVarWarns[varWarn]:
                 
-                print 'nope'
+ #               print 'nope'
                 
                 convergence = 0
                 
         # if converged return warnings
         if convergence == 1:
             
-            print '\nconverged in  t = ', t, '\nfinal varWarns: '
+#            print '\nconverged in  t = ', t, '\nfinal varWarns: '
             
             return varWarns
 
@@ -427,16 +445,23 @@ c_h = clause('h', [x5, x8], [1, 1])
 c_i = clause('i', [x5, x6], [-1, 1])
 fig3 = [c_a, c_b, c_c, c_d, c_e, c_f, c_g, c_h, c_i]
 
+x1.val = 1
+x2.val = 1
+x3.val = 1
+x4.val = 1
+x5.val = 1
+x6.val = 1
+x7.val = 1
 c_z = clause('z', [x1, x2, x3, x4, x5, x6, x7], [-1,-1, -1, -1, -1, -1, -1])
 
 
 
 
 print 'clause z SAT-table: \n', c_z.generateSATtable(), '\n'
-print 'fig. 3: '
-for clause in fig3:
-    print clause.info(), '\n'
-print '\n', wid(fig3, 100)
+#print 'fig. 3: '
+#for clause in fig3:
+#    print clause.info(), '\n'
+#print '\n', wid(fig3, 100)
 
 
 
