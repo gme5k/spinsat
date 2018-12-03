@@ -50,20 +50,24 @@ class clause:
         edgeValProducts = []
         
             
-            # calculate edge * value
+        # calculate edge * value
         empty = True 
         for var in self.vars:
-            print var.val
+            
             if var.val != None:
                 empty = False
                 edgeValProducts.append(var.val * self.getEdge(var))
-       
+                print 'variable: ', var.name,  var.val * self.getEdge(var)
 
         # sat = 0 if at least one variable satisfies clause, else sat = 2
         # [mezard K-SAT paper eq. 5]
-        sat = 1
-        print empty
-        if empty == False:
+        
+#        print 'empty = ',  empty
+        if empty == True:
+            return 2
+        
+        else:
+            sat = 1
             for i in edgeValProducts:
                 sat *= (1 + i) / 2.0
               #  print sat
@@ -71,15 +75,9 @@ class clause:
                 # if one variable satisfies, do not calculate others
                 if sat == 0:
                     break
-            print 'sat: ', int(2 * sat)
             return int(2 * sat)
         
-        else:
-            return 2
-
-       
-
-        
+            
     def generateSATtable(self):
     # tries all combinations of var. values and prints sat. table
         
@@ -93,9 +91,10 @@ class clause:
 
             # set var. values to generated values
             for i in range(len(valSet)):
-                self.vars[i].value = valSet[i]
-                
-            
+                self.vars[i].val = valSet[i]
+            # print valSet
+            # print 'printing checkSAT'
+            # print self.checkSAT()
             table.append([valSet, self.checkSAT()])
        
         # return '0 = sat, 2 = unsat'
@@ -204,7 +203,7 @@ def wid(fig, tmax):
             print i.name, conNumbs[i]
         print '\n'
 
-        # check if fig in UNSAT with contradiction numbers
+        # check if fig is UNSAT with contradiction numbers
         for var in conNumbs:
 
             if conNumbs[var] != 0:
@@ -213,70 +212,79 @@ def wid(fig, tmax):
                 pass
 
         # check for local fields, set variable values according to local fields
-        locFieldPresent = 0
+        locFieldPresent = False
+        
         print 'variables after taking into account local fields: '
+        
         for var in varsDone:
                 
             if locFields[var] > 0:
-                locFieldPresnt = 1
+                locFieldPresnt = True
                 var.val = 1
 
             elif locFields[var] < 0:
-                locFieldPresent = 1
+                locFieldPresent = True
                 var.val = -1
                 
             else:
                 pass
        
             print 'var: ', var.name, 'val: ', var.val
+
+        # if no local fields, set random var to random var value
+        if locFieldPresent ==  False:
+             varsDone[random.randint(0, len(varsDone) - 1)].val\
+                 = random.randint(-1, 1)
+           
+
+            
         print '\ncheckSat: '
 
-        # remove satisfied stuff
-        if locFieldPresent == 1:
+        # remove clauses
+        for clause in fig:
 
-            # remove clauses
-            for clause in fig:
+            print 'clause: ', clause.name
 
-                print clause.name, clause.checkSAT()
-                print clause.generateSATtable()
-                if clause.checkSAT() == 0:
-                    fig.remove(clause)
-                    print 'removed clause: ', clause.name
+            if clause.checkSAT() == 0:
+                fig.remove(clause)
+
+                print 'removed clause: ', clause.name
+
+            elif clause.checkSAT() == 2:
                 
-                # elif clause.checkSAT() == 2:
-                #     for var in clause.vars:
-                #         print 'clause: ', clause.name, 'variable: ', var.name,' varVal: ', var.val
-                #         if var.val != None:
-                #             print 'variable', var.name, 'removed from', clause.name
-                #             clause.vars.remove(var)
-               
-            print '\n'    
-            for clause in fig:
-                if clause.checkSAT() == 2:
-                    for var in clause.vars:
-                        print 'clause: ', clause.name, 'variable: ', var.name,' varVal: ', var.val
-                        if var.val != None:
-                            print 'variable', var.name, 'removed from', clause.name
-                            clause.vars.remove(var)
-               
-            print '\n'
-            
-            # remove variables
-     
+                print 'did not remove clause: ', clause.name
+                print 'checking for variables that tend to satisfy clause: ',\
+                    clause.name
+                
+                for var in clause.vars:
+                    
+                    if var.val == None: 
+                        print 'clause: ', clause.name, 'variable: ',\
+                            var.name, var.val
+                    if var.val != None:
+                         print 'clause: ', clause.name, 'variable: ',\
+                            var.name, var.val * clause.getEdge(var)
+                         if var.val * clause.getEdge(var) == -1:
+                             print 'this should be removed'
+                             
+                    if var.val == -1 * clause.getEdge(var):
+
+                        print 'variable', var.name, 'removed from',\
+                            clause.name
+
+                        clause.vars.remove(var)
+
+
         print '\nclauses left'
         for clause in fig:
             print clause.name
         print '\nvariable values: '
         for var in varsDone:
             print var.name, var.val
-                
-            
-     #   if locFieldPresent == 0:
-            
-                
-                
-
         
+
+
+            
 def wpUpdate(edges, varWarns, a, i):
     newVarWarn = 1
     cavFields = {}
@@ -405,7 +413,7 @@ def warnProp(clauses, tmax):
         # if converged return warnings
         if convergence == 1:
             
-#            print '\nconverged in  t = ', t, '\nfinal varWarns: '
+            print '\nconverged in  t = ', t, '\nfinal varWarns: '
             
             return varWarns
 
@@ -445,23 +453,16 @@ c_h = clause('h', [x5, x8], [1, 1])
 c_i = clause('i', [x5, x6], [-1, 1])
 fig3 = [c_a, c_b, c_c, c_d, c_e, c_f, c_g, c_h, c_i]
 
-x1.val = 1
-x2.val = 1
-x3.val = 1
-x4.val = 1
-x5.val = 1
-x6.val = 1
-x7.val = 1
+
 c_z = clause('z', [x1, x2, x3, x4, x5, x6, x7], [-1,-1, -1, -1, -1, -1, -1])
 
 
 
-
-print 'clause z SAT-table: \n', c_z.generateSATtable(), '\n'
+#print 'clause z SAT-table: \n', c_z.generateSATtable(), '\n'
 #print 'fig. 3: '
 #for clause in fig3:
 #    print clause.info(), '\n'
-#print '\n', wid(fig3, 100)
+print wid(fig3, 100)
 
 
 
