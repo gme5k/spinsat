@@ -57,7 +57,11 @@ class clause:
             if var.val != None:
                 empty = False
                 edgeValProducts.append(var.val * self.getEdge(var))
-                print 'variable: ', var.name,  var.val * self.getEdge(var)
+
+                if var.val * self.getEdge(var) == -1:
+                    print 'variable: ', var.name, 'SAT'
+                else:
+                    print 'variable: ', var.name, 'UNSAT' 
 
         # sat = 0 if at least one variable satisfies clause, else sat = 2
         # [mezard K-SAT paper eq. 5]
@@ -120,7 +124,8 @@ class variable:
 
 def WID(fig, tmax):
     WIDvars = []
-    
+
+    # initialize the list containing all variables
     for clause in fig:
         
         for var in clause.vars:
@@ -131,33 +136,38 @@ def WID(fig, tmax):
     # add vars from edges to unique var list: WIDvars.
    
        
- 
+    
     WIDcycle = 0
     while unfixedCount > 0:
         varWarns = warnProp(fig, tmax)
         edges = varWarns.keys()
-       
+        print '\nu*_a -> i'
+        for i in varWarns:
+            print i[0].name, i[1].name, varWarns[i]
         locFields = {}
         conNumbs = {}
         curVars = []
         if varWarns == 'UN-CONVERGED':
             return 'UN-CONVERGED'
-
+        
+        # only run if warnProp converges
         else:
 
-            for edge in edges:
-                edgeVar = edge[1]
-                if edgeVar not in curVars:
-                    curVars.append(edgeVar)
+            # make list of variables contained in warnings
+            for var in WIDvars:
+            
+                if var.val == None:
+                    curVars.append(var)
                     
+            print '\nusing these variables this WIDcycle: '
+            for var in curVars:
+                print var.name
             print '\nWIDcycle = ', WIDcycle, '\nN unfixed variables: '\
                 , unfixedCount
-            print '\nu*_a -> i'
-            for i in varWarns:
-                print i[0].name, i[1].name, varWarns[i]
 
             # for every variable calculate local field and contradiction number
             for i in curVars:
+                # print 'current variable: ', i.name
                 locField = 0
                 posEdgeVarWarnSum = 0
                 negEdgeVarWarnSum = 0
@@ -172,31 +182,33 @@ def WID(fig, tmax):
                         b = edge[0]
                         edgeVal = b.getEdge(i)
                         warning = varWarns[(b, i)]
-                        locField += edgeVal * warning
+                        locField += (edgeVal * warning)
 
-#                            print '    curClause', b.name
-#                            print '    cur locfield: ', locField
-
+                        # print '    curClause', b.name
+                        # print '    edgeVal: ', edgeVal, 'warning: ', warning,\
+                        #     'edgeVal * warning: ', edgeVal * warning, \
+                        #     'locfield: ', locField
+                        
                             # part of math for contradiction numbers
                         if edgeVal == -1:
                             posEdgeVarWarnSum += warning
 
-#                                print '     edgeVal: ', edgeVal, ' posEdgeVarWarn: '\
-#                                    , varWarns[(b,i)]
+                            # print '     edgeVal: ', edgeVal, ' posEdgeVarWarn: '\
+                            #     , varWarns[(b,i)]
 
                         elif edgeVal == 1:
                             negEdgeVarWarnSum += warning
 
- #                               print '    edgeVal: ', edgeVal, ' posEdgeVarWarn: '\
- #                                   , varWarns[(b,i)]
+                            # print '    edgeVal: ', edgeVal, ' posEdgeVarWarn: '\
+                            #     , varWarns[(b,i)]
 
-                    # store local field in dictionary
-                locFields[i] = -1 * locField
+                # store local field in dictionary
+                locFields[i] = -1 *  locField
 
                
-#                    print 'pEVWS: ', posEdgeVarWarnSum, 'nEVWS: ', negEdgeVarWarnSum
-#                    print 'product of posEVWS and negEVWS: ',\
-#                        posEdgeVarWarnSum * negEdgeVarWarnSum
+                # print 'pEVWS: ', posEdgeVarWarnSum, 'nEVWS: ', negEdgeVarWarnSum
+                # print 'product of posEVWS and negEVWS: ',\
+                #     posEdgeVarWarnSum * negEdgeVarWarnSum
 
                     # calculate contradiction number
                 if posEdgeVarWarnSum * negEdgeVarWarnSum > 0:      
@@ -205,8 +217,8 @@ def WID(fig, tmax):
                 else:
                     conNum = 0
                 conNumbs[i] = conNum
-#                print 'resulting locField: ', locFields[i]
-#                print 'resulting contradiction number: ', conNum
+                # print 'resulting locField: ', locFields[i]
+                # print 'resulting contradiction number: ', conNum
 
             print '\nlocal fields: '
             for i in locFields:
@@ -224,7 +236,8 @@ def WID(fig, tmax):
                 else:
                     pass
 
-            # check for local fields, set variable values according to local fields
+            # check for local fields, set variable values according to
+            # local fields
             locFieldPresent = False
            
 
@@ -250,15 +263,9 @@ def WID(fig, tmax):
 
             # if no local fields, set random var to random var value
             if locFieldPresent ==  False:
-                unallocVars = []
-                
-                for var in curVars:
-
-                    if var.val == None:
-                        unallocVars.append(var)
-                print 'len unalloc: ', len(unallocVars)
-                ranVar = random.choice(unallocVars)
-                ranVal = random.randrange(-1,1,2)
+               
+                ranVar = random.choice(curVars)
+                ranVal = random.randrange(-1, 2, 2)
                 ranVar.val = ranVal
                 print 'no local fields, doing something random'
                 print ranVar.name, ranVal
@@ -266,13 +273,16 @@ def WID(fig, tmax):
 
 
 
-            print '\ncleaning . . . '
-            print 'clauses!: '
-            for clause in fig:
-                print clause.name
+           
+            
             # clean figure
+
+            print '\ncleaning . . . \n'
+            
             newFig = []
+            
             for clause in fig:
+                
                 print 'clause: ', clause.name
 
                 if clause.checkSAT() == 2:
@@ -281,24 +291,22 @@ def WID(fig, tmax):
 
                         if var.val == None:
                             
-                            print 'clause: ', clause.name, 'variable: ',\
-                                 var.name, var.val
+                            # print 'clause: ', clause.name, 'variable: ',\
+                            #      var.name, var.val,
                             
                             newVars.append(var)
                             
                         elif var.val * clause.getEdge(var) == 1:
-                            
-                            print 'clause: ', clause.name, 'variable: ',\
-                                 var.name, var.val * clause.getEdge(var)
-                            
                             newVars.append(var)
                             
+                            # print 'clause: ', clause.name, 'variable: ',\
+                            #     var.name, 'UNSAT'
                         else:
                             
-                             print 'clause: ', clause.name, 'variable: ',\
-                                 var.name, var.val * clause.getEdge(var)
-                           
-                             print 'removed var: ', var.name, 'from clause: ', clause.name
+                             # print 'clause: ', clause.name, 'variable: ',\
+                             #     var.name, 'SAT'
+                             print 'removed var: ', var.name, 'from clause: '\
+                                 , clause.name
         
                        
                     print 'newVars: '
@@ -314,7 +322,7 @@ def WID(fig, tmax):
                
                 print clause.name
                 for var in clause.vars:
-                    print var.name
+                    print '    ', var.name
                 
 
                 # else:
@@ -341,15 +349,11 @@ def WID(fig, tmax):
 
                 #             clause.vars.remove(var)
 
-
-            print '\nclauses left'
-            for clause in fig:
-                print clause.name
             print '\nvariable values: '
             for var in WIDvars:
                 print var.name, var.val
         WIDcycle += 1
-    print 'all variables asigned'
+    print '\nall variables asigned'
     return WIDvars
 
 
@@ -363,8 +367,8 @@ def wpUpdate(edges, varWarns, a, i):
         # if any (j) exists, set sums of warnings u_b -> j to 0
         if edge[0] == a and edge[1] != i:
 
-#           print '    var (j) with matching clause to (a): ',edge[0].name,\
-#                edge[1].name
+            # print '    var (j) with matching clause to (a): ',edge[0].name,\
+            #     edge[1].name
             
             j = edge[1]
             posEdgeVarWarnSum = 0
@@ -379,23 +383,23 @@ def wpUpdate(edges, varWarns, a, i):
                     b = edge[0]
                     edgeVal = b.getEdge(j)
                     
-#                    print '        clause (b) with matching var to (j): ',\
-#                       edge[0].name, edge[1].name
+                    # print '        clause (b) with matching var to (j): ',\
+                    #     edge[0].name, edge[1].name
 
                     # if edge value = -1 (solid line), add u_b -> j to
                     # sum of warnings from un-negated variables
                     if edgeVal == -1:
                         posEdgeVarWarnSum += varWarns[(b,j)]
                         
-#                        print '        edgeVal: ', edgeVal, ' posEdgeVarWarn: '\
-#                            , varWarns[(b,j)]
+                        # print '        edgeVal: ', edgeVal, ' posEdgeVarWarn: '\
+                        #     , varWarns[(b,j)]
 
                     # else if edge value = 1 (dotted line), add u_b > j to
                     # sum of warnings from negated variables
                     elif edgeVal == 1:
                         
-#                        print  '        edgeVal: ', edgeVal, 'negEdgeVarWarn: ',\
-#                            varWarns[(b,j)]
+                        # print  '        edgeVal: ', edgeVal, 'negEdgeVarWarn: ',\
+                        #     varWarns[(b,j)]
                         
                         negEdgeVarWarnSum += varWarns[(b,j)]
                         
@@ -403,17 +407,17 @@ def wpUpdate(edges, varWarns, a, i):
             cavFields[(j,a)] = posEdgeVarWarnSum - negEdgeVarWarnSum
             newVarWarn *=  theta(cavFields[(j,a)] * a.getEdge(j))
         
- #           print '    sum of positive edge warnings: ', posEdgeVarWarnSum
- #           print '    sum of negative edge warnings: ', negEdgeVarWarnSum
- #           print '    resulting cavity field: ', cavFields[(j,a)]
- #           print '    current resulting cavity fields: \n'
- #           print '    variable (j), clause (a), cavity field (h_j -> a), J^a_j'
- #           for cavField in cavFields:
- #               print '   ', cavField[0].name, cavField[1].name,\
-#                    cavFields[cavField], cavField[1].getEdge(cavField[0])
- #           print '\n    current newVarWarn: ', newVarWarn
+    #         print '    sum of positive edge warnings: ', posEdgeVarWarnSum
+    #         print '    sum of negative edge warnings: ', negEdgeVarWarnSum
+    #         print '    resulting cavity field: ', cavFields[(j,a)]
+    #         print '    current resulting cavity fields: \n'
+    #         print '    variable (j), clause (a), cavity field (h_j -> a), J^a_j'
+    #         for cavField in cavFields:
+    #             print '   ', cavField[0].name, cavField[1].name,\
+    #                 cavFields[cavField], cavField[1].getEdge(cavField[0])
+    #             print '\n    current newVarWarn: ', newVarWarn
             
- #   print 'resulting newVarWarn: ', newVarWarn, '\n'
+    # print 'resulting newVarWarn: ', newVarWarn, '\n'
     
     return newVarWarn
  
@@ -433,7 +437,7 @@ def warnProp(clauses, tmax):
         for i in a.vars:
             varWarns[(a, i)] = random.randint(0,1)
             
-    print 'initial u_a - > i: '
+    print '\ninitial u_a - > i: '
     for varWarn in varWarns:
         print varWarn[0].name, varWarn[1].name, varWarns[varWarn]
 
@@ -508,15 +512,15 @@ x5 = variable(5)
 x6 = variable(6)
 x7 = variable(7)
 x8 = variable(8)
-c_a = clause('a', [x1], [1])
-c_b = clause('b', [x2], [-1])
-c_c = clause('c', [x1, x2, x3], [-1, 1, 1])
-c_d = clause('d', [x3, x4], [-1, 1])
-c_e = clause('e', [x3, x5], [1, 1])
-c_f = clause('f', [x4], [1])
-c_g = clause('g', [x4, x7], [1, -1])
-c_h = clause('h', [x5, x8], [1, 1])
-c_i = clause('i', [x5, x6], [-1, 1])
+c_a = clause('a', [x1], [-1])
+c_b = clause('b', [x2], [1])
+c_c = clause('c', [x1, x2, x3], [1, -1, -1])
+c_d = clause('d', [x3, x4], [1, -1])
+c_e = clause('e', [x3, x5], [-1, -1])
+c_f = clause('f', [x4], [-1])
+c_g = clause('g', [x4, x7], [-1, 1])
+c_h = clause('h', [x5, x8], [-1, -1])
+c_i = clause('i', [x5, x6], [1, -1])
 fig3 = [c_a, c_b, c_c, c_d, c_e, c_f, c_g, c_h, c_i]
 
 
