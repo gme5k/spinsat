@@ -3,8 +3,7 @@ import random
 
 
 
-
-class clause:
+class Clause:
 # input:
 #     string                       name
 #     list of variable objects     vars
@@ -113,7 +112,7 @@ class clause:
 
     
     
-class variable:
+class Variable:
 # input
 #     int     name
     
@@ -172,7 +171,7 @@ def WID(fig, tmax):
                 posEdgeVarWarnSum = 0
                 negEdgeVarWarnSum = 0
                    
-                # look for b's and update local field from  corresponding
+                # look for b's and update local field from corresponding
                 # warnings
                 for edge in edges:
                     
@@ -357,6 +356,10 @@ def WID(fig, tmax):
     return WIDvars
 
 
+
+
+# input: shuffled order of edges, warnings, edge a i
+# output: updated warning for edge a i
 def wpUpdate(edges, varWarns, a, i):
     newVarWarn = 1
     cavFields = {}
@@ -424,6 +427,8 @@ def wpUpdate(edges, varWarns, a, i):
 
 
 
+# input CNF graph and tmax
+# output u*_a -> i
 def warnProp(clauses, tmax):
     varWarns = {}
     oldVarWarns = {}
@@ -436,20 +441,22 @@ def warnProp(clauses, tmax):
 
         for i in a.vars:
             varWarns[(a, i)] = random.randint(0,1)
-            
+            # varWarns[(a, i)] = 0
+            # varWarns[(a, i)] = 1
     print '\ninitial u_a - > i: '
+    print 'clause, variable, message value'
     for varWarn in varWarns:
         print varWarn[0].name, varWarn[1].name, varWarns[varWarn]
 
     edges = varWarns.keys()
-
+    t += 1
     # while t < tmax, iterate over every edge in a random fashion and update
     # warnings sequntially using the wpUpdate routine
     while t < tmax:
       
         random.shuffle(edges)
         
-#        print '\nt = ', t
+        print '\nt = ', t
 #        print '\nedges order: '
 #        for edge in edges:
 #            print edge[0].name, edge[1].name
@@ -470,7 +477,8 @@ def warnProp(clauses, tmax):
         convergence = 1
         
 #        print 'oldVarWarns, varWarns'
-
+        for i in varWarns:
+            print i[0].name, i[1].name, varWarns[i]
         # check for convergence
         for varWarn in varWarns:
             
@@ -481,7 +489,7 @@ def warnProp(clauses, tmax):
  #               print 'nope'
                 
                 convergence = 0
-    
+       
         # if converged return warnings
         if convergence == 1:
             print '\nconverged in  t = ', t
@@ -502,29 +510,62 @@ def theta(x):
 
 
 
+
+
+def ranGraph(K):
     
-# Braunstein survey propogation paper Fig. 3
-x1 = variable(1)
-x2 = variable(2)
-x3 = variable(3)
-x4 = variable(4)
-x5 = variable(5)
-x6 = variable(6)
-x7 = variable(7)
-x8 = variable(8)
-c_a = clause('a', [x1], [-1])
-c_b = clause('b', [x2], [1])
-c_c = clause('c', [x1, x2, x3], [1, -1, -1])
-c_d = clause('d', [x3, x4], [1, -1])
-c_e = clause('e', [x3, x5], [-1, -1])
-c_f = clause('f', [x4], [-1])
-c_g = clause('g', [x4, x7], [-1, 1])
-c_h = clause('h', [x5, x8], [-1, -1])
-c_i = clause('i', [x5, x6], [1, -1])
-fig3 = [c_a, c_b, c_c, c_d, c_e, c_f, c_g, c_h, c_i]
+    fig = []
+    varlist = []
+    clauses = []
+    nVar = random.randint(5,15)
+    nCls = random.randint(5,15)
+    
+    print 'nCls: ', nCls, 'nVar: ', nVar
+
+    for i in range(nVar):
+        varlist.append(Variable(i))
+   
+    for clause in range(nCls):
+        clsVars = []
+        posVarPicks = []
+        
+        for var in varlist:
+            posVarPicks.append(var) 
+       
+        for j in range(K):
+            ranVar = random.choice(posVarPicks)
+            clsVars.append(ranVar)
+            posVarPicks.remove(ranVar)
+       
+        print 'i picked: \n', 
+        for i in clsVars:
+            print i.name
+        print 'new clause\n'
 
 
-c_z = clause('z', [x1, x2, x3, x4, x5, x6, x7], [-1,-1, -1, -1, -1, -1, -1])
+
+    
+# # Braunstein survey propogation paper Fig. 3
+# x1 = Variable(1)
+# x2 = Variable(2)
+# x3 = Variable(3)
+# x4 = Variable(4)
+# x5 = Variable(5)
+# x6 = Variable(6)
+# x7 = Variable(7)
+# x8 = Variable(8)
+# c_a = Clause(1, [x1], [-1])
+# c_b = Clause(2, [x2], [1])
+# c_c = Clause(3, [x1, x2, x3], [1, -1, -1])
+# c_d = Clause(4, [x3, x4], [1, -1])
+# c_e = Clause(5, [x3, x5], [-1, -1])
+# c_f = Clause(6, [x4], [-1])
+# c_g = Clause(7, [x4, x7], [-1, 1])
+# c_h = Clause(8, [x5, x8], [-1, -1])
+# c_i = Clause(9, [x5, x6], [1, -1])
+# fig3 = [c_a, c_b, c_c, c_d, c_e, c_f, c_g, c_h, c_i]
+
+# c_z = Clause('z', [x1, x2, x3, x4, x5, x6, x7], [-1,-1, -1, -1, -1, -1, -1])
 
 
 
@@ -532,8 +573,10 @@ c_z = clause('z', [x1, x2, x3, x4, x5, x6, x7], [-1,-1, -1, -1, -1, -1, -1])
 #print 'fig. 3: '
 #for clause in fig3:
 #    print clause.info(), '\n'
-print WID(fig3, 100)
+# print WID(fig3, 100)         
 
+
+print ranGraph(3)
 
 
 # 0 and 1 are opposite
