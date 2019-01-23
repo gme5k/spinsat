@@ -1,6 +1,7 @@
 import itertools
 import random
-
+import networkx
+import matplotlib.pyplot as plt
 
 
 class Clause:
@@ -16,6 +17,7 @@ class Clause:
             assert edge == 1 or edge == -1, 'edge value has to be be 1 or -1'
             
         assert len(vars) == len(edges), 'no equal amount of variables & edges'
+        self.type = 'c'
         self.edges = edges
         self.name = name
         self.vars = vars
@@ -117,6 +119,7 @@ class Variable:
 #     int     name
     
     def __init__(self, name):
+        self.type = 'v'
         self.name = name
         self.val = None
 
@@ -510,12 +513,10 @@ def theta(x):
 
 
 
-
-
 def ranGraph(K):
     
     fig = []
-    varlist = []
+    variables = []
     clauses = []
     nVar = random.randint(5,15)
     nCls = random.randint(5,15)
@@ -523,26 +524,97 @@ def ranGraph(K):
     print 'nCls: ', nCls, 'nVar: ', nVar
 
     for i in range(nVar):
-        varlist.append(Variable(i))
+        variables.append(Variable(i))
    
     for clause in range(nCls):
         clsVars = []
         posVarPicks = []
+        edgeVals = []
         
-        for var in varlist:
+        for var in variables:
             posVarPicks.append(var) 
        
         for j in range(K):
             ranVar = random.choice(posVarPicks)
             clsVars.append(ranVar)
             posVarPicks.remove(ranVar)
+            edgeVals.append(random.randrange(-1,2,2))
+        fig.append(Clause(clause, clsVars, edgeVals))
+        
        
         print 'i picked: \n', 
         for i in clsVars:
             print i.name
+        for i in edgeVals:
+            print i
         print 'new clause\n'
+    for clause in fig:
+        print "clause name: ",clause.name
+        for var in clause.vars:
+            print var.name
+        for edge in clause.edges:
+            print edge
+   
+    return fig, variables
 
 
+
+
+
+
+def plotGraph(fig, variables):
+    G = networkx.Graph()
+    color_map = []
+    labels = {}
+    
+    for v in variables:
+        G.add_node(v, s = 'o', c = 'blue')
+        labels[v] = 'V'+str(v.name)
+        
+    for c in fig:
+        G.add_node(c, s = 's', c = 'red')
+        labels[c] = 'C'+str(c.name)
+        
+        for v in c.vars:
+            G.add_edge(c, v)
+            
+    for node in G:
+        
+        if node.type == 'v':
+            color_map.append('blue')
+         
+           
+            
+        if node.type == 'c':
+            color_map.append('red')
+
+
+
+
+
+    color_map = ['red', 'blue']
+    nodeShapes = set((aShape[1]["s"] for aShape in G.nodes(data=True)))
+    pos = networkx.kamada_kawai_layout(G)
+    for aShape in nodeShapes:
+        networkx.draw(
+            G, 
+            pos,
+            labels = labels,
+            with_labels=True, 
+            node_shape = aShape, 
+            node_color = 'white',
+            node_size=1000, 
+            nodelist = [
+                sNode[0] for sNode in filter(lambda x: x[1]["s"]==aShape, G.nodes(data=True))
+            ]
+        )
+        
+
+    # plot = networkx.draw_kamada_kawai(G, labels = labels,\
+    #                                   node_color = color_map, with_labels=True)
+    plt.show()
+
+    
 
     
 # # Braunstein survey propogation paper Fig. 3
@@ -575,8 +647,10 @@ def ranGraph(K):
 #    print clause.info(), '\n'
 # print WID(fig3, 100)         
 
+fig, variables = ranGraph(3)
 
-print ranGraph(3)
+
+plotGraph(fig, variables)
 
 
 # 0 and 1 are opposite
