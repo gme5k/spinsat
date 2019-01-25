@@ -4,6 +4,7 @@ import networkx
 import matplotlib.pyplot as plt
 
 
+  
 class Clause:
 # input:
 #     string                       name
@@ -60,14 +61,13 @@ class Clause:
                 edgeValProducts.append(var.val * self.getEdge(var))
 
                 if var.val * self.getEdge(var) == -1:
-                    print 'variable: ', var.name, 'SAT'
+                    print >>f, 'variable: ', var.name, 'SAT'
                 else:
-                    print 'variable: ', var.name, 'UNSAT' 
+                    print >>f, 'variable: ', var.name, 'UNSAT' 
 
         # sat = 0 if at least one variable satisfies clause, else sat = 2
         # [mezard K-SAT paper eq. 5]
         
-#        print 'empty = ',  empty
         if empty == True:
             return 2
         
@@ -75,7 +75,6 @@ class Clause:
             sat = 1
             for i in edgeValProducts:
                 sat *= (1 + i) / 2.0
-              #  print sat
 
                 # if one variable satisfies, do not calculate others
                 if sat == 0:
@@ -97,9 +96,7 @@ class Clause:
             # set var. values to generated values
             for i in range(len(valSet)):
                 self.vars[i].val = valSet[i]
-            # print valSet
-            # print 'printing checkSAT'
-            # print self.checkSAT()
+
             table.append([valSet, self.checkSAT()])
        
         # return '0 = sat, 2 = unsat'
@@ -111,8 +108,7 @@ class Clause:
             
         return None
 
-
-    
+ 
     
 class Variable:
 # input
@@ -124,32 +120,29 @@ class Variable:
         self.val = None
 
 
-def WID(fig, tmax):
+def WID(clauses, variables, tmax):
     WIDvars = []
+    locFieldCount = {}
 
     # initialize the list containing all variables
-    for clause in fig:
-        
-        for var in clause.vars:
-            
-            if var not in WIDvars:
-                WIDvars.append(var)
+    for var in variables:
+        WIDvars.append(var)
     unfixedCount = len(WIDvars)
-    # add vars from edges to unique var list: WIDvars.
-   
-       
-    
     WIDcycle = 0
+    
     while unfixedCount > 0:
-        varWarns = warnProp(fig, tmax)
-        edges = varWarns.keys()
-        print '\nu*_a -> i'
-        for i in varWarns:
-            print i[0].name, i[1].name, varWarns[i]
+        locFieldCount[WIDcycle] = 0
+        messages = warnProp(clauses, tmax)
+        edges = messages.keys()
+        print >>f, '\nu*_a -> i'
+        
+        for i in messages:
+            print >>f, i[0].name, i[1].name, messages[i]
+    
         locFields = {}
         conNumbs = {}
         curVars = []
-        if varWarns == 'UN-CONVERGED':
+        if messages == 'UN-CONVERGED':
             return 'UN-CONVERGED'
         
         # only run if warnProp converges
@@ -157,19 +150,19 @@ def WID(fig, tmax):
 
             # make list of variables contained in warnings
             for var in WIDvars:
-            
                 if var.val == None:
                     curVars.append(var)
                     
-            print '\nusing these variables this WIDcycle: '
+            print >>f, '\nusing these variables this WIDcycle: '
             for var in curVars:
-                print var.name
-            print '\nWIDcycle = ', WIDcycle, '\nN unfixed variables: '\
+                print >>f, var.name
+            print >>f, '\nWIDcycle = ', WIDcycle, '\nN unfixed variables: '\
                 , unfixedCount
 
             # for every variable calculate local field and contradiction number
             for i in curVars:
-                # print 'current variable: ', i.name
+                
+                # print >>f, 'current variable: ', i.name
                 locField = 0
                 posEdgeVarWarnSum = 0
                 negEdgeVarWarnSum = 0
@@ -183,52 +176,36 @@ def WID(fig, tmax):
                        
                         b = edge[0]
                         edgeVal = b.getEdge(i)
-                        warning = varWarns[(b, i)]
+                        warning = messages[(b, i)]
                         locField += (edgeVal * warning)
 
-                        # print '    curClause', b.name
-                        # print '    edgeVal: ', edgeVal, 'warning: ', warning,\
-                        #     'edgeVal * warning: ', edgeVal * warning, \
-                        #     'locfield: ', locField
-                        
-                            # part of math for contradiction numbers
+                        # part of math for contradiction numbers
                         if edgeVal == -1:
                             posEdgeVarWarnSum += warning
 
-                            # print '     edgeVal: ', edgeVal, ' posEdgeVarWarn: '\
-                            #     , varWarns[(b,i)]
-
+                       
                         elif edgeVal == 1:
                             negEdgeVarWarnSum += warning
 
-                            # print '    edgeVal: ', edgeVal, ' posEdgeVarWarn: '\
-                            #     , varWarns[(b,i)]
-
+                           
                 # store local field in dictionary
                 locFields[i] = -1 *  locField
 
-               
-                # print 'pEVWS: ', posEdgeVarWarnSum, 'nEVWS: ', negEdgeVarWarnSum
-                # print 'product of posEVWS and negEVWS: ',\
-                #     posEdgeVarWarnSum * negEdgeVarWarnSum
-
-                    # calculate contradiction number
+                 # calculate contradiction number
                 if posEdgeVarWarnSum * negEdgeVarWarnSum > 0:      
                     conNum = 1
 
                 else:
                     conNum = 0
                 conNumbs[i] = conNum
-                # print 'resulting locField: ', locFields[i]
-                # print 'resulting contradiction number: ', conNum
 
-            print '\nlocal fields: '
+            print >>f, '\nlocal fields: '
             for i in locFields:
-                print i.name, locFields[i]
-            print '\ncontradiction numbers: '
+                print >>f, i.name, locFields[i]
+            print >>f, '\ncontradiction numbers: '
             for i in conNumbs:
-                print i.name, conNumbs[i]
-            print '\n'
+                print >>f, i.name, conNumbs[i]
+            print >>f, '\n'
 
             # check if fig is UNSAT with contradiction numbers
             for var in conNumbs:
@@ -241,16 +218,17 @@ def WID(fig, tmax):
             # check for local fields, set variable values according to
             # local fields
             locFieldPresent = False
-           
-
+    
             for var in curVars:
 
                 if locFields[var] > 0:
-                    locFieldPresnt = True
+                    locFieldCount[WIDcycle] += 1
+                    locFieldPresent = True
                     var.val = 1
                     unfixedCount -= 1
 
                 elif locFields[var] < 0:
+                    locFieldCount[WIDcycle] += 1
                     locFieldPresent = True
                     var.val = -1
                     unfixedCount -= 1
@@ -259,9 +237,9 @@ def WID(fig, tmax):
                     pass
 
             if locFieldPresent == True: 
-                print 'variables after taking into account local fields: '
+                print >>f, 'variables after taking into account local fields: '
                 for var in curVars: 
-                    print 'var: ', var.name, 'val: ', var.val
+                    print >>f, 'var: ', var.name, 'val: ', var.val
 
             # if no local fields, set random var to random var value
             if locFieldPresent ==  False:
@@ -269,23 +247,19 @@ def WID(fig, tmax):
                 ranVar = random.choice(curVars)
                 ranVal = random.randrange(-1, 2, 2)
                 ranVar.val = ranVal
-                print 'no local fields, doing something random'
-                print ranVar.name, ranVal
+                print >>f, 'no local fields, doing something random'
+                print >>f, ranVar.name, ranVal
                 unfixedCount -= 1
-
-
-
-           
             
             # clean figure
 
-            print '\ncleaning . . . \n'
+            print >>f, '\ncleaning . . . \n'
             
             newFig = []
             
-            for clause in fig:
+            for clause in clauses:
                 
-                print 'clause: ', clause.name
+                print >>f, 'clause: ', clause.name
 
                 if clause.checkSAT() == 2:
                     newVars = []
@@ -293,7 +267,7 @@ def WID(fig, tmax):
 
                         if var.val == None:
                             
-                            # print 'clause: ', clause.name, 'variable: ',\
+                            # print >>f, 'clause: ', clause.name, 'variable: ',\
                             #      var.name, var.val,
                             
                             newVars.append(var)
@@ -301,61 +275,39 @@ def WID(fig, tmax):
                         elif var.val * clause.getEdge(var) == 1:
                             newVars.append(var)
                             
-                            # print 'clause: ', clause.name, 'variable: ',\
+                            # print >>f, 'clause: ', clause.name, 'variable: ',\
                             #     var.name, 'UNSAT'
                         else:
                             
-                             # print 'clause: ', clause.name, 'variable: ',\
+                             # print >>f, 'clause: ', clause.name, 'variable: ',\
                              #     var.name, 'SAT'
-                             print 'removed var: ', var.name, 'from clause: '\
+                             print >>f, 'removed var: ', var.name, 'from clause: '\
                                  , clause.name
         
                        
-                    print 'newVars: '
+                    print >>f, 'newVars: '
                     for var in newVars:
-                        print var.name
+                        print >>f, var.name
                     clause.vars = newVars
                     newFig.append(clause)
                 else:
-                    print 'removed clause: ', clause.name
-            fig = newFig
-            print 'newFig: '
+                    print >>f, 'removed clause: ', clause.name
+            clauses = newFig
+            print >>f, 'newFig: '
             for clause in newFig:
-               
-                print clause.name
+                print >>f, clause.name
                 for var in clause.vars:
-                    print '    ', var.name
-                
-
-                # else:
-
-                #     print 'did not remove clause: ', clause.name
-                #     print 'checking for variables that tend to satisfy clause: ',\
-                #         clause.name
-
-                #     for var in clause.vars:
-
-                #         if var.val == None: 
-                #             print 'clause: ', clause.name, 'variable: ',\
-                #                 var.name, var.val
-                #         if var.val != None:
-                #              print 'clause: ', clause.name, 'variable: ',\
-                #                 var.name, var.val * clause.getEdge(var)
-                #              if var.val * clause.getEdge(var) == -1:
-                #                  print 'this should be removed'
-
-                #         if var.val == -1 * clause.getEdge(var):
-
-                #             print 'variable', var.name, 'removed from',\
-                #                 clause.name
-
-                #             clause.vars.remove(var)
-
-            print '\nvariable values: '
+                    print >>f, '    ', var.name
+            print >>f, '\nvariable values: '
             for var in WIDvars:
-                print var.name, var.val
+                print >>f, var.name, var.val
+                
         WIDcycle += 1
-    print '\nall variables asigned'
+        
+    print >>f, '\nall variables asigned in: ', WIDcycle, 'cycles. \n'
+    print >>f, 'local fields processed: '
+    for entry in locFieldCount:
+        print >>f, entry, locFieldCount[entry]
     return WIDvars
 
 
@@ -363,7 +315,7 @@ def WID(fig, tmax):
 
 # input: shuffled order of edges, warnings, edge a i
 # output: updated warning for edge a i
-def wpUpdate(edges, varWarns, a, i):
+def wpUpdate(edges, messages, a, i):
     newVarWarn = 1
     cavFields = {}
     
@@ -373,7 +325,7 @@ def wpUpdate(edges, varWarns, a, i):
         # if any (j) exists, set sums of warnings u_b -> j to 0
         if edge[0] == a and edge[1] != i:
 
-            # print '    var (j) with matching clause to (a): ',edge[0].name,\
+            # print >>f, '    var (j) with matching clause to (a): ',edge[0].name,\
             #     edge[1].name
             
             j = edge[1]
@@ -389,41 +341,29 @@ def wpUpdate(edges, varWarns, a, i):
                     b = edge[0]
                     edgeVal = b.getEdge(j)
                     
-                    # print '        clause (b) with matching var to (j): ',\
+                    # print >>f, '        clause (b) with matching var to (j): ',\
                     #     edge[0].name, edge[1].name
 
                     # if edge value = -1 (solid line), add u_b -> j to
                     # sum of warnings from un-negated variables
                     if edgeVal == -1:
-                        posEdgeVarWarnSum += varWarns[(b,j)]
+                        posEdgeVarWarnSum += messages[(b,j)]
                         
-                        # print '        edgeVal: ', edgeVal, ' posEdgeVarWarn: '\
-                        #     , varWarns[(b,j)]
+                        # print >>f, '        edgeVal: ', edgeVal, ' posEdgeVarWarn: '\
+                        #     , messages[(b,j)]
 
                     # else if edge value = 1 (dotted line), add u_b > j to
                     # sum of warnings from negated variables
                     elif edgeVal == 1:
                         
-                        # print  '        edgeVal: ', edgeVal, 'negEdgeVarWarn: ',\
-                        #     varWarns[(b,j)]
+                        # print >>f,  '        edgeVal: ', edgeVal, 'negEdgeVarWarn: ',\
+                        #     messages[(b,j)]
                         
-                        negEdgeVarWarnSum += varWarns[(b,j)]
+                        negEdgeVarWarnSum += messages[(b,j)]
                         
             # store cavity field and update new warning
             cavFields[(j,a)] = posEdgeVarWarnSum - negEdgeVarWarnSum
             newVarWarn *=  theta(cavFields[(j,a)] * a.getEdge(j))
-        
-    #         print '    sum of positive edge warnings: ', posEdgeVarWarnSum
-    #         print '    sum of negative edge warnings: ', negEdgeVarWarnSum
-    #         print '    resulting cavity field: ', cavFields[(j,a)]
-    #         print '    current resulting cavity fields: \n'
-    #         print '    variable (j), clause (a), cavity field (h_j -> a), J^a_j'
-    #         for cavField in cavFields:
-    #             print '   ', cavField[0].name, cavField[1].name,\
-    #                 cavFields[cavField], cavField[1].getEdge(cavField[0])
-    #             print '\n    current newVarWarn: ', newVarWarn
-            
-    # print 'resulting newVarWarn: ', newVarWarn, '\n'
     
     return newVarWarn
  
@@ -433,70 +373,61 @@ def wpUpdate(edges, varWarns, a, i):
 # input CNF graph and tmax
 # output u*_a -> i
 def warnProp(clauses, tmax):
-    varWarns = {}
+    messages = {}
     oldVarWarns = {}
     vars = []
     t = 0
 
-    # generate random warnings u_a -> i, messages from clauses to variables AKA
-    # varWarns
+    # generate random messages u_a -> i, messages from clauses to variables
     for a in clauses:
 
         for i in a.vars:
-            varWarns[(a, i)] = random.randint(0,1)
-            # varWarns[(a, i)] = 0
-            # varWarns[(a, i)] = 1
-    print '\ninitial u_a - > i: '
-    print 'clause, variable, message value'
-    for varWarn in varWarns:
-        print varWarn[0].name, varWarn[1].name, varWarns[varWarn]
+            messages[(a, i)] = random.randint(0,1)
+ 
+    print >>f, '\ninitial u_a - > i: '
+    print >>f, 'clause, variable, message value'
+    for message in messages:
+        print >>f, message[0].name, message[1].name, messages[message]
 
-    edges = varWarns.keys()
+    edges = messages.keys()
     t += 1
+    
     # while t < tmax, iterate over every edge in a random fashion and update
     # warnings sequntially using the wpUpdate routine
     while t < tmax:
       
         random.shuffle(edges)
         
-        print '\nt = ', t
-#        print '\nedges order: '
-#        for edge in edges:
-#            print edge[0].name, edge[1].name
-#        print '\n'
+        print >>f, '\nt = ', t
 
         for edge in edges:
             i = edge[1]
             a = edge[0]
-            
-#            print 'current edge (a) (i): ', edge[0].name, edge[1].name
-#            print 'varWarn: ', varWarns[(a,i)]
 
-            # store old warnings in similar dictionary to varWarns
-            oldVarWarns[(a,i)] = varWarns[(a,i)]
+            # store old warnings in similar dictionary to messages
+            oldVarWarns[(a,i)] = messages[(a,i)]
             
             # update varwarns with wpUpdate
-            varWarns[(a,i)] = wpUpdate(edges, varWarns, a, i)
+            messages[(a,i)] = wpUpdate(edges, messages, a, i)
         convergence = 1
         
-#        print 'oldVarWarns, varWarns'
-        for i in varWarns:
-            print i[0].name, i[1].name, varWarns[i]
+
+        for i in messages:
+            print >>f, i[0].name, i[1].name, messages[i]
         # check for convergence
-        for varWarn in varWarns:
+        for message in messages:
             
- #           print oldVarWarns[varWarn], varWarns[varWarn]
+
             
-            if varWarns[varWarn] != oldVarWarns[varWarn]:
-                
- #               print 'nope'
-                
+            if messages[message] != oldVarWarns[message]:
                 convergence = 0
        
         # if converged return warnings
         if convergence == 1:
-            print '\nconverged in  t = ', t
-            return varWarns
+            
+            print >>f, '\nconverged in  t = ', t
+            
+            return messages
 
         # if not, and time is up, return uncovnerged
         elif t == tmax:
@@ -513,111 +444,152 @@ def theta(x):
 
 
 
-def ranGraph(K):
+def ranGraph(kMin, kMax, cMin, cMax, vMin, vMax):
     
-    fig = []
-    variables = []
     clauses = []
-    nVar = random.randint(5,15)
-    nCls = random.randint(5,15)
+    variables = []
+  
+    nVar = random.randint(vMin,vMax)
+    nCls = random.randint(cMin,cMax)
     
-    print 'nCls: ', nCls, 'nVar: ', nVar
+    print >>f, 'nCls: ', nCls, 'nVar: ', nVar
 
     for i in range(nVar):
         variables.append(Variable(i))
    
     for clause in range(nCls):
         clsVars = []
-        posVarPicks = []
+        possVarPicks = []
         edgeVals = []
         
         for var in variables:
-            posVarPicks.append(var) 
+            possVarPicks.append(var) 
        
-        for j in range(K):
-            ranVar = random.choice(posVarPicks)
+        for j in range(random.randrange(kMin, kMax+1)):
+            ranVar = random.choice(possVarPicks)
             clsVars.append(ranVar)
-            posVarPicks.remove(ranVar)
+            possVarPicks.remove(ranVar)
             edgeVals.append(random.randrange(-1,2,2))
-        fig.append(Clause(clause, clsVars, edgeVals))
-        
-       
-        print 'i picked: \n', 
+        clauses.append(Clause(clause, clsVars, edgeVals))
+    return clauses, variables
+
+
+
+def ranTree(kMin, kMax, cMin, cMax, vMin, vMax):
+    print 'tree'
+    clauses = []
+    variables = []
+  
+    nVar = random.randint(vMin,vMax)
+    nCls = random.randint(cMin,cMax)
+    
+    print  'nCls: ', nCls, 'nVar: ', nVar
+
+    for i in range(nVar):
+        variables.append(Variable(i))
+   
+    for clause in range(nCls):
+    
+        possVarPicks = []
+        edgeVals = []
+        x =  random.randrange(0, len(variables) + 1)
+        print 'new clause, sampling x amount: ', x 
+        clsVars = random.sample(variables, x)
         for i in clsVars:
             print i.name
-        for i in edgeVals:
-            print i
-        print 'new clause\n'
-    for clause in fig:
-        print "clause name: ",clause.name
-        for var in clause.vars:
-            print var.name
-        for edge in clause.edges:
-            print edge
-   
-    return fig, variables
+
+        for i in clsVars:
+            variables.remove(i)
+       
+        print 'vars left \n'
+        for i in variables:
+            print i.name
+            
 
 
-
-
-
-
-def plotGraph(fig, variables):
+        
+def plotGraph(clauses, variables):
     G = networkx.Graph()
     color_map = []
     labels = {}
     
     for v in variables:
-        G.add_node(v, s = 'o', c = 'blue')
-        labels[v] = 'V'+str(v.name)
+        G.add_node(v, s = 'o')
+        labels[v] = 'V_'+str(v.name)+'\n'+str(v.val)
+    print >>f, 'clause, var, edge value'
+    for c in clauses:
+        G.add_node(c, s = 's')
+        labels[c] = 'C_'+str(c.name)
+
+       
         
-    for c in fig:
-        G.add_node(c, s = 's', c = 'red')
-        labels[c] = 'C'+str(c.name)
-        
-        for v in c.vars:
-            G.add_edge(c, v)
+        for i in range(len(c.vars)):
+
+            print >>f, c.name, c.vars[i].name, c.edges[i], '\n'
             
-    for node in G:
-        
-        if node.type == 'v':
-            color_map.append('blue')
-         
-           
-            
-        if node.type == 'c':
-            color_map.append('red')
-
-
-
-
-
-    color_map = ['red', 'blue']
+            if c.edges[i] == -1:
+                G.add_edge(c, c.vars[i], color = 'blue')
+                
+                
+            else:  
+                G.add_edge(c, c.vars[i], color = 'red')      
+    colors = [G[u][v]['color'] for u,v in G.edges]
     nodeShapes = set((aShape[1]["s"] for aShape in G.nodes(data=True)))
-    pos = networkx.kamada_kawai_layout(G)
+    nodePos = networkx.kamada_kawai_layout(G)
+
     for aShape in nodeShapes:
-        networkx.draw(
+        networkx.draw_networkx_nodes(
             G, 
-            pos,
+            nodePos,
             labels = labels,
-            with_labels=True, 
+            with_labels = True, 
             node_shape = aShape, 
             node_color = 'white',
-            node_size=1000, 
-            nodelist = [
-                sNode[0] for sNode in filter(lambda x: x[1]["s"]==aShape, G.nodes(data=True))
-            ]
+            linewidths = 0.1,
+            node_size = 4, 
+            nodelist = [sNode[0] for sNode \
+                        in filter(lambda x: x[1]["s"] == aShape, G.nodes(data=True))]
         )
-        
-
-    # plot = networkx.draw_kamada_kawai(G, labels = labels,\
-    #                                   node_color = color_map, with_labels=True)
-    plt.show()
-
+    networkx.draw_networkx_edges(G, nodePos, edge_color = colors, width = 0.1, alpha = 0.5)
+    networkx.draw_networkx_labels(G, nodePos, labels = labels, font_size = 0.75)
+    plt.savefig('foo.pdf', bbox_inches='tight', dpi = 1700)
+    
+    
+if __name__== "__main__":
+    # f = open('output.txt','w')
+    # clauses, variables = ranGraph(1, 3, 160, 160, 40, 40 )   
+    # print >>f, WID(clauses, variables, 100)
+    # plotGraph(clauses, variables)
+    print ranTree(1, 3, 10, 10, 40, 40)
     
 
-    
-# # Braunstein survey propogation paper Fig. 3
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    # Braunstein survey propogation paper Fig. 3
 # x1 = Variable(1)
 # x2 = Variable(2)
 # x3 = Variable(3)
@@ -636,22 +608,13 @@ def plotGraph(fig, variables):
 # c_h = Clause(8, [x5, x8], [-1, -1])
 # c_i = Clause(9, [x5, x6], [1, -1])
 # fig3 = [c_a, c_b, c_c, c_d, c_e, c_f, c_g, c_h, c_i]
-
 # c_z = Clause('z', [x1, x2, x3, x4, x5, x6, x7], [-1,-1, -1, -1, -1, -1, -1])
-
-
-
 #print 'clause z SAT-table: \n', c_z.generateSATtable(), '\n'
 #print 'fig. 3: '
 #for clause in fig3:
 #    print clause.info(), '\n'
+
+
 # print WID(fig3, 100)         
-
-fig, variables = ranGraph(3)
-
-
-plotGraph(fig, variables)
-
-
 # 0 and 1 are opposite
 # # -1 and 1 are opposite
