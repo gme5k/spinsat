@@ -4,6 +4,7 @@ import random
 import networkx
 import matplotlib.pyplot as plt
 import subprocess
+import glob
 
 
   
@@ -568,14 +569,23 @@ def plotGraph(clauses, variables, filename):
         )
     networkx.draw_networkx_edges(G, nodePos, edge_color = colors, width = 1, alpha = 0.5)
     networkx.draw_networkx_labels(G, nodePos, labels = labels, font_size = 5)
-    plt.savefig('out/'+str(filename)+'.png', bbox_inches='tight', dpi = 200)
+    plt.savefig('out/'+str(filename)+'.png', bbox_inches='tight', dpi = 100)
     plt.clf()
     
 if __name__== "__main__":
     if os.path.exists("out/slideshow.avi"):
         os.remove("out/slideshow.avi")
-    os.remove("out/output.txt")
-    subprocess.call(["rm","-f","out/*.png", ])
+        os.remove("out/output.txt")
+
+
+
+
+    for pic in glob.glob("out\\*.png"):
+        os.remove(pic)
+    for pic in glob.glob("out\\resized\\*.png"):
+        os.remove(pic)
+    # subprocess.call(["rm","-f","out/*.png", ])
+    # subprocess.call(["rm","-f","out/resized/*.png", ])
     f = open('out/output.txt','w')
     clauses, variables = ranGraph(3, 3, 20, 20, 5, 5 )   
     print >>f, WID(clauses, variables, 100)
