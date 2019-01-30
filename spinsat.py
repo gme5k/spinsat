@@ -133,20 +133,24 @@ def WID(clauses, variables, tmax):
     while unfixedCount > 0:
         locFieldCount[WIDcycle] = 0
         messages = warnProp(clauses, tmax)
-        edges = messages.keys()
-        print >>f, '\nu*_a -> i'
-        
-        for i in messages:
-            print >>f, i[0].name, i[1].name, messages[i]
-    
-        locFields = {}
-        conNumbs = {}
-        curVars = []
         if messages == 'UN-CONVERGED':
             return 'UN-CONVERGED'
+
+    
+       
+        
         
         # only run if warnProp converges
         else:
+            edges = messages.keys()
+            print >>f, '\nu*_a -> i'
+        
+            for i in messages:
+                print >>f, i[0].name, i[1].name, messages[i]
+    
+            locFields = {}
+            conNumbs = {}
+            curVars = []
 
             # make list of variables contained in warnings
             for var in WIDvars:
@@ -261,26 +265,36 @@ def WID(clauses, variables, tmax):
                 
                 print >>f, 'clause: ', clause.name
 
+                # if not SAT
                 if clause.checkSAT() == 2:
                     newVars = []
+                    
                     for var in clause.vars:
 
+                        # if variable unassigned
                         if var.val == None:
                             
-                            # print >>f, 'clause: ', clause.name, 'variable: ',\
-                            #      var.name, var.val,
-                            
+                            print >>f, 'clause: ', clause.name, 'variable: ',\
+                                 var.name, var.val,
+
+                            # keep var
                             newVars.append(var)
-                            
+
+                        # else if variable does not satisfy clause
                         elif var.val * clause.getEdge(var) == 1:
+
+                            # keep var
                             newVars.append(var)
                             
-                            # print >>f, 'clause: ', clause.name, 'variable: ',\
-                            #     var.name, 'UNSAT'
+                            print >>f, 'clause: ', clause.name, 'variable: ',\
+                                var.name, 'UNSAT'
+
+                        # else if variable satisfies clause, do not keep var
                         else:
                             
-                             # print >>f, 'clause: ', clause.name, 'variable: ',\
-                             #     var.name, 'SAT'
+                             print >>f, 'clause: ', clause.name, 'variable: ',\
+                                 var.name, 'SAT'
+                             
                              print >>f, 'removed var: ', var.name, 'from clause: '\
                                  , clause.name
         
@@ -304,7 +318,7 @@ def WID(clauses, variables, tmax):
                 
         WIDcycle += 1
         
-    print >>f, '\nall variables asigned in: ', WIDcycle, 'cycles. \n'
+    print >>f, '\nall variables assigned in: ', WIDcycle, 'cycles. \n'
     print >>f, 'local fields processed: '
     for entry in locFieldCount:
         print >>f, entry, locFieldCount[entry]
@@ -387,7 +401,7 @@ def warnProp(clauses, tmax):
     print >>f, '\ninitial u_a - > i: '
     print >>f, 'clause, variable, message value'
     for message in messages:
-        print >>f, message[0].name, message[1].name, messages[message]
+        print >>f, "c_"+str(message[0].name), "v_"+str(message[1].name), messages[message]
 
     edges = messages.keys()
     t += 1
@@ -408,12 +422,13 @@ def warnProp(clauses, tmax):
             oldVarWarns[(a,i)] = messages[(a,i)]
             
             # update varwarns with wpUpdate
+       
             messages[(a,i)] = wpUpdate(edges, messages, a, i)
         convergence = 1
         
-
+    
         for i in messages:
-            print >>f, i[0].name, i[1].name, messages[i]
+            print >>f,  "c_"+str(i[0].name), "v_"+str(i[1].name), messages[i]
         # check for convergence
         for message in messages:
             
@@ -504,7 +519,6 @@ def ranTree(kMin, kMax, cMin, cMax, vMin, vMax):
         print 'vars left \n'
         for i in variables:
             print i.name
-            
 
 
         
@@ -516,21 +530,16 @@ def plotGraph(clauses, variables):
     for v in variables:
         G.add_node(v, s = 'o')
         labels[v] = 'V_'+str(v.name)+'\n'+str(v.val)
-    print >>f, 'clause, var, edge value'
+
     for c in clauses:
         G.add_node(c, s = 's')
         labels[c] = 'C_'+str(c.name)
-
-       
-        
+               
         for i in range(len(c.vars)):
-
-            print >>f, c.name, c.vars[i].name, c.edges[i], '\n'
             
             if c.edges[i] == -1:
                 G.add_edge(c, c.vars[i], color = 'blue')
-                
-                
+            
             else:  
                 G.add_edge(c, c.vars[i], color = 'red')      
     colors = [G[u][v]['color'] for u,v in G.edges]
@@ -545,23 +554,24 @@ def plotGraph(clauses, variables):
             with_labels = True, 
             node_shape = aShape, 
             node_color = 'white',
-            linewidths = 0.1,
-            node_size = 4, 
+            linewidths = 1,
+            node_size = 200, 
             nodelist = [sNode[0] for sNode \
                         in filter(lambda x: x[1]["s"] == aShape, G.nodes(data=True))]
         )
-    networkx.draw_networkx_edges(G, nodePos, edge_color = colors, width = 0.1, alpha = 0.5)
-    networkx.draw_networkx_labels(G, nodePos, labels = labels, font_size = 0.75)
-    plt.savefig('foo.pdf', bbox_inches='tight', dpi = 1700)
+    networkx.draw_networkx_edges(G, nodePos, edge_color = colors, width = 1, alpha = 0.5)
+    networkx.draw_networkx_labels(G, nodePos, labels = labels, font_size = 5)
+    plt.savefig('fig.pdf', bbox_inches='tight', dpi = 1700)
     
     
 if __name__== "__main__":
-    # f = open('output.txt','w')
-    # clauses, variables = ranGraph(1, 3, 160, 160, 40, 40 )   
-    # print >>f, WID(clauses, variables, 100)
-    # plotGraph(clauses, variables)
-    print ranTree(1, 3, 10, 10, 40, 40)
+
+    f = open('output.txt','w')
+    clauses, variables = ranGraph(3, 3, 20, 20, 5, 5 )   
+    print >>f, WID(clauses, variables, 100)
+    plotGraph(clauses, variables)
     
+
 
 
 
@@ -618,3 +628,12 @@ if __name__== "__main__":
 # print WID(fig3, 100)         
 # 0 and 1 are opposite
 # # -1 and 1 are opposite
+
+
+ # x1 = Variable(1)
+ #    x2 = Variable(2)
+ #    x3 = Variable(3)
+
+ #    c_a = Clause(1, [x1, x2], [-1, 1])
+ #    c_b = Clause(2, [x2, x3], [-1, 1])
+ #    c_c = Clause(3, [x3, x1], [-1, -1])
