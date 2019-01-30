@@ -1,7 +1,9 @@
+import os
 import itertools
 import random
 import networkx
 import matplotlib.pyplot as plt
+import subprocess
 
 
   
@@ -121,6 +123,7 @@ class Variable:
 
 
 def WID(clauses, variables, tmax):
+    
     WIDvars = []
     locFieldCount = {}
 
@@ -129,17 +132,17 @@ def WID(clauses, variables, tmax):
         WIDvars.append(var)
     unfixedCount = len(WIDvars)
     WIDcycle = 0
-    
+   
+   
+    # plotGraph(clauses, variables, '0init')
     while unfixedCount > 0:
+        
         locFieldCount[WIDcycle] = 0
         messages = warnProp(clauses, tmax)
+        
         if messages == 'UN-CONVERGED':
             return 'UN-CONVERGED'
 
-    
-       
-        
-        
         # only run if warnProp converges
         else:
             edges = messages.keys()
@@ -317,11 +320,13 @@ def WID(clauses, variables, tmax):
                 print >>f, var.name, var.val
                 
         WIDcycle += 1
+        plotGraph(clauses, variables, WIDcycle)
         
     print >>f, '\nall variables assigned in: ', WIDcycle, 'cycles. \n'
     print >>f, 'local fields processed: '
     for entry in locFieldCount:
         print >>f, entry, locFieldCount[entry]
+   
     return WIDvars
 
 
@@ -522,9 +527,11 @@ def ranTree(kMin, kMax, cMin, cMax, vMin, vMax):
 
 
         
-def plotGraph(clauses, variables):
+def plotGraph(clauses, variables, filename):
+  
     G = networkx.Graph()
-    color_map = []
+    
+    G.clear()
     labels = {}
     
     for v in variables:
@@ -544,7 +551,7 @@ def plotGraph(clauses, variables):
                 G.add_edge(c, c.vars[i], color = 'red')      
     colors = [G[u][v]['color'] for u,v in G.edges]
     nodeShapes = set((aShape[1]["s"] for aShape in G.nodes(data=True)))
-    nodePos = networkx.kamada_kawai_layout(G)
+    nodePos = networkx.shell_layout(G)
 
     for aShape in nodeShapes:
         networkx.draw_networkx_nodes(
@@ -561,15 +568,21 @@ def plotGraph(clauses, variables):
         )
     networkx.draw_networkx_edges(G, nodePos, edge_color = colors, width = 1, alpha = 0.5)
     networkx.draw_networkx_labels(G, nodePos, labels = labels, font_size = 5)
-    plt.savefig('fig.pdf', bbox_inches='tight', dpi = 1700)
-    
+    plt.savefig('out/'+str(filename)+'.png', bbox_inches='tight', dpi = 200)
+    plt.clf()
     
 if __name__== "__main__":
-
-    f = open('output.txt','w')
+    if os.path.exists("out/slideshow.avi"):
+        os.remove("out/slideshow.avi")
+    os.remove("out/output.txt")
+    subprocess.call(["rm","-f","out/*.png", ])
+    f = open('out/output.txt','w')
     clauses, variables = ranGraph(3, 3, 20, 20, 5, 5 )   
     print >>f, WID(clauses, variables, 100)
-    plotGraph(clauses, variables)
+    subprocess.call(["mogrify", "-path", "out/resized", "-resize", "1398x1060!", "out/*.png"])
+    subprocess.call(["ffmpeg", "-r", "0.75", "-pattern_type", "glob", "-i", "out/resized/*.png", "-c:v", "copy", "out/slideshow.avi"])
+    subprocess.call(["vlc","out/slideshow.avi"])
+    
     
 
 
