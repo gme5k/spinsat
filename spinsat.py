@@ -4,7 +4,8 @@ import random
 import networkx
 import matplotlib.pyplot as plt
 import subprocess
-import glob
+import shutil
+import math
 
 
   
@@ -123,6 +124,7 @@ class Variable:
         self.val = None
 
 
+        
 def WID(clauses, variables, tmax):
     
     WIDvars = []
@@ -133,9 +135,7 @@ def WID(clauses, variables, tmax):
         WIDvars.append(var)
     unfixedCount = len(WIDvars)
     WIDcycle = 0
-   
-   
-    # plotGraph(clauses, variables, '0init')
+    plotGraph(clauses, variables, '0000')
     while unfixedCount > 0:
         
         locFieldCount[WIDcycle] = 0
@@ -321,7 +321,9 @@ def WID(clauses, variables, tmax):
                 print >>f, var.name, var.val
                 
         WIDcycle += 1
-        plotGraph(clauses, variables, WIDcycle)
+        imgName = (4  - len(str(WIDcycle))) * '0' + str(WIDcycle)
+        print 'later images', imgName
+        plotGraph(clauses, variables, imgName)
         
     print >>f, '\nall variables assigned in: ', WIDcycle, 'cycles. \n'
     print >>f, 'local fields processed: '
@@ -333,6 +335,188 @@ def WID(clauses, variables, tmax):
 
 
 
+
+def belProp(clauses, tmax, precision):
+    messages = {}
+    oldMessages = {}
+    vars = []
+    t = 0
+
+    # generate random messages u_a -> i, messages from clauses to variables
+    for a in clauses:
+
+        for i in a.vars:
+            messages[(a, i)] = random.randint(0,1)
+ 
+    print >>f, '\ninitial u_a - > i: '
+    print >>f, 'clause, variable, message value'
+    for message in messages:
+        print >>f, "c_"+str(message[0].name), "v_"+str(message[1].name), messages[message]
+
+    edges = messages.keys()
+    t += 1
+    
+    # while t < tmax, iterate over every edge in a random fashion and update
+    # warnings sequntially using the wpUpdate routine
+    while t < tmax:
+      
+        random.shuffle(edges)
+        
+        print >>f, '\nt = ', t
+
+        for edge in edges:
+            i = edge[1]
+            a = edge[0]
+
+            # store old warnings in similar dictionary to messages
+            oldMessages[(a,i)] = messages[(a,i)]
+            
+            # update varwarns with wpUpdate
+       
+            messages[(a,i)] = bpUpdate(edges, messages, a, i)
+        convergence = 1
+        
+    
+        for i in messages:
+            print >>f,  "c_"+str(i[0].name), "v_"+str(i[1].name), messages[i]
+        # check for convergence
+        for message in messages:
+            
+            if abs(messages[message] - oldMessages[message]) < precision:
+                convergence = 0
+       
+        # if converged return warnings
+        if convergence == 1:
+            
+            print >>f, '\nconverged in  t = ', t
+            
+            return messages
+
+        # if not, and time is up, return uncovnerged
+        elif t == tmax:
+            return 'UNCONVERGED'
+        t += 1
+
+
+        
+# input CNF graph and tmax
+# output u*_a -> i
+def warnProp(clauses, tmax):
+    messages = {}
+    oldMessages = {}
+    vars = []
+    t = 0
+
+    # generate random messages u_a -> i, messages from clauses to variables
+    for a in clauses:
+
+        for i in a.vars:
+            messages[(a, i)] = random.randint(0,1)
+ 
+    print >>f, '\ninitial u_a - > i: '
+    print >>f, 'clause, variable, message value'
+    for message in messages:
+        print >>f, "c_"+str(message[0].name), "v_"+str(message[1].name), messages[message]
+
+    edges = messages.keys()
+    t += 1
+    
+    # while t < tmax, iterate over every edge in a random fashion and update
+    # warnings sequntially using the wpUpdate routine
+    while t < tmax:
+      
+        random.shuffle(edges)
+        
+        print >>f, '\nt = ', t
+
+        for edge in edges:
+            i = edge[1]
+            a = edge[0]
+
+            # store old warnings in similar dictionary to messages
+            oldMessages[(a,i)] = messages[(a,i)]
+            
+            # update varwarns with wpUpdate
+       
+            messages[(a,i)] = wpUpdate(edges, messages, a, i)
+        convergence = 1
+        
+        for i in messages:
+            print >>f,  "c_"+str(i[0].name), "v_"+str(i[1].name), messages[i]
+            
+        # check for convergence
+        for message in messages:
+        
+            if messages[message] != oldMessages[message]:
+                convergence = 0
+       
+        # if converged return warnings
+        if convergence == 1:
+            
+            print >>f, '\nconverged in  t = ', t
+            
+            return messages
+
+        # if not, and time is up, return uncovnerged
+        elif t == tmax:
+            return 'UNCONVERGED'
+        t += 1
+            
+        
+# input: shuffled order of edges, warnings, edge a i
+# output: updated warning for edge a i
+def bpUpdate(edges, messages, a, i):
+    newVarWarn = 1
+    cavFields = {}
+    
+    # find (j) element of V(a)\i, i.e. the other variables attached to (a)
+    for edge in edges:
+
+        # if any (j) exists, set sums of warnings u_b -> j to 0
+        if edge[0] == a and edge[1] != i:
+
+            # print >>f, '    var (j) with matching clause to (a): ',edge[0].name,\
+            #     edge[1].name
+            
+            j = edge[1]
+            posEdgeVarWarnSum = 0
+            negEdgeVarWarnSum = 0
+            
+            # compute cavity fields h_j -> a, messages from variables to clauses
+            for edge in edges:
+
+                # find (b) element of V(j)\a, i.e. the other clauses besides (a)
+                # attached to (j)
+                if edge[1] == j and edge[0] != a:
+                    b = edge[0]
+                    edgeVal = b.getEdge(j)
+                    
+                    # print >>f, '        clause (b) with matching var to (j): ',\
+                    #     edge[0].name, edge[1].name
+
+                    # if edge value = -1 (solid line), add u_b -> j to
+                    # sum of warnings from un-negated variables
+                    if edgeVal == -1:
+                        posEdgeVarWarnSum += messages[(b,j)]
+                        
+                        # print >>f, '        edgeVal: ', edgeVal, ' posEdgeVarWarn: '\
+                        #     , messages[(b,j)]
+
+                    # else if edge value = 1 (dotted line), add u_b > j to
+                    # sum of warnings from negated variables
+                    elif edgeVal == 1:
+                        
+                        # print >>f,  '        edgeVal: ', edgeVal, 'negEdgeVarWarn: ',\
+                        #     messages[(b,j)]
+                        
+                        negEdgeVarWarnSum += messages[(b,j)]
+                        
+            # store cavity field and update new warning
+            cavFields[(j,a)] = posEdgeVarWarnSum - negEdgeVarWarnSum
+            newVarWarn *=  theta(cavFields[(j,a)] * a.getEdge(j))
+    
+    return newVarWarn
+        
 # input: shuffled order of edges, warnings, edge a i
 # output: updated warning for edge a i
 def wpUpdate(edges, messages, a, i):
@@ -386,75 +570,7 @@ def wpUpdate(edges, messages, a, i):
             newVarWarn *=  theta(cavFields[(j,a)] * a.getEdge(j))
     
     return newVarWarn
- 
 
-
-
-# input CNF graph and tmax
-# output u*_a -> i
-def warnProp(clauses, tmax):
-    messages = {}
-    oldVarWarns = {}
-    vars = []
-    t = 0
-
-    # generate random messages u_a -> i, messages from clauses to variables
-    for a in clauses:
-
-        for i in a.vars:
-            messages[(a, i)] = random.randint(0,1)
- 
-    print >>f, '\ninitial u_a - > i: '
-    print >>f, 'clause, variable, message value'
-    for message in messages:
-        print >>f, "c_"+str(message[0].name), "v_"+str(message[1].name), messages[message]
-
-    edges = messages.keys()
-    t += 1
-    
-    # while t < tmax, iterate over every edge in a random fashion and update
-    # warnings sequntially using the wpUpdate routine
-    while t < tmax:
-      
-        random.shuffle(edges)
-        
-        print >>f, '\nt = ', t
-
-        for edge in edges:
-            i = edge[1]
-            a = edge[0]
-
-            # store old warnings in similar dictionary to messages
-            oldVarWarns[(a,i)] = messages[(a,i)]
-            
-            # update varwarns with wpUpdate
-       
-            messages[(a,i)] = wpUpdate(edges, messages, a, i)
-        convergence = 1
-        
-    
-        for i in messages:
-            print >>f,  "c_"+str(i[0].name), "v_"+str(i[1].name), messages[i]
-        # check for convergence
-        for message in messages:
-            
-
-            
-            if messages[message] != oldVarWarns[message]:
-                convergence = 0
-       
-        # if converged return warnings
-        if convergence == 1:
-            
-            print >>f, '\nconverged in  t = ', t
-            
-            return messages
-
-        # if not, and time is up, return uncovnerged
-        elif t == tmax:
-            return 'UNCONVERGED'
-        t += 1
-            
 
 
 def theta(x):
@@ -479,59 +595,66 @@ def ranGraph(kMin, kMax, cMin, cMax, vMin, vMax):
         variables.append(Variable(i))
    
     for clause in range(nCls):
-        clsVars = []
-        possVarPicks = []
+        # clsVars = []
+        # possVarPicks = []
         edgeVals = []
         
-        for var in variables:
-            possVarPicks.append(var) 
-       
-        for j in range(random.randrange(kMin, kMax+1)):
-            ranVar = random.choice(possVarPicks)
-            clsVars.append(ranVar)
-            possVarPicks.remove(ranVar)
+        # for var in variables:
+        #     possVarPicks.append(var) 
+        ranVars = random.sample(variables, random.randrange(kMin, kMax + 1))
+        for ranVar in ranVars:
             edgeVals.append(random.randrange(-1,2,2))
-        clauses.append(Clause(clause, clsVars, edgeVals))
+       
+        
+        # for j in range(random.randrange(kMin, kMax+1)):
+            # ranVar = random.choice(possVarPicks)
+            # clsVars.append(ranVar)
+            # possVarPicks.remove(ranVar)
+                    
+        clauses.append(Clause(clause, ranVars, edgeVals))
     return clauses, variables
 
-
-
-def ranTree(kMin, kMax, cMin, cMax, vMin, vMax):
-    print 'tree'
-    clauses = []
-    variables = []
-  
-    nVar = random.randint(vMin,vMax)
-    nCls = random.randint(cMin,cMax)
-    
-    print  'nCls: ', nCls, 'nVar: ', nVar
-
-    for i in range(nVar):
-        variables.append(Variable(i))
-   
-    for clause in range(nCls):
-    
-        possVarPicks = []
-        edgeVals = []
-        x =  random.randrange(0, len(variables) + 1)
-        print 'new clause, sampling x amount: ', x 
-        clsVars = random.sample(variables, x)
-        for i in clsVars:
-            print i.name
-
-        for i in clsVars:
-            variables.remove(i)
+        
+    # for clause in range(nCls):
+    #     clsVars = []
+    #     possVarPicks = []
+    #     edgeVals = []
+        
+    #     for var in variables:
+    #         possVarPicks.append(var) 
        
-        print 'vars left \n'
-        for i in variables:
-            print i.name
+    #     for j in range(random.randrange(kMin, kMax+1)):
+    #         ranVar = random.choice(possVarPicks)
+    #         clsVars.append(ranVar)
+    #         possVarPicks.remove(ranVar)
+    #         edgeVals.append(random.randrange(-1,2,2))
+    #     clauses.append(Clause(clause, clsVars, edgeVals))
+    # return clauses, variables
+    
+   
+    # for clause in range(nCls):
+    
+    #     possVarPicks = []
+    #     edgeVals = []
+    #     x =  random.randrange(0, len(variables) + 1)
+    #     print 'new clause, sampling x amount: ', x 
+    #     clsVars = random.sample(variables, x)
+
+    #     for i in clsVars:
+    #         print i.name
+
+    #     for i in clsVars:
+    #         variables.remove(i)
+       
+    #     print 'vars left \n'
+    #     for i in variables:
+    #         print i.name
 
 
         
-def plotGraph(clauses, variables, filename):
+def plotGraph(clauses, variables, imgName):
   
     G = networkx.Graph()
-    
     G.clear()
     labels = {}
     
@@ -549,10 +672,10 @@ def plotGraph(clauses, variables, filename):
                 G.add_edge(c, c.vars[i], color = 'blue')
             
             else:  
-                G.add_edge(c, c.vars[i], color = 'red')      
+                G.add_edge(c, c.vars[i], color = 'red')
     colors = [G[u][v]['color'] for u,v in G.edges]
     nodeShapes = set((aShape[1]["s"] for aShape in G.nodes(data=True)))
-    nodePos = networkx.shell_layout(G)
+    nodePos = networkx.kamada_kawai_layout(G)
 
     for aShape in nodeShapes:
         networkx.draw_networkx_nodes(
@@ -562,37 +685,29 @@ def plotGraph(clauses, variables, filename):
             with_labels = True, 
             node_shape = aShape, 
             node_color = 'white',
-            linewidths = 1,
-            node_size = 200, 
+            linewidths = 0.1,
+            node_size = 10, 
             nodelist = [sNode[0] for sNode \
                         in filter(lambda x: x[1]["s"] == aShape, G.nodes(data=True))]
         )
-    networkx.draw_networkx_edges(G, nodePos, edge_color = colors, width = 1, alpha = 0.5)
-    networkx.draw_networkx_labels(G, nodePos, labels = labels, font_size = 5)
-    plt.savefig('out/'+str(filename)+'.png', bbox_inches='tight', dpi = 100)
+    networkx.draw_networkx_edges(G, nodePos, edge_color = colors, width = 0.1, alpha = 0.5)
+    networkx.draw_networkx_labels(G, nodePos, labels = labels, font_size = 1)
+    print 'name in plotGraph', imgName
+    plt.savefig('out/'+imgName+'.png', bbox_inches='tight', dpi = 700)
     plt.clf()
     
 if __name__== "__main__":
-    if os.path.exists("out/slideshow.avi"):
-        os.remove("out/slideshow.avi")
-        os.remove("out/output.txt")
-
-
-
-
-    for pic in glob.glob("out\\*.png"):
-        os.remove(pic)
-    for pic in glob.glob("out\\resized\\*.png"):
-        os.remove(pic)
-    # subprocess.call(["rm","-f","out/*.png", ])
-    # subprocess.call(["rm","-f","out/resized/*.png", ])
+ 
+    shutil.rmtree('out')
+    os.mkdir('out')
+    os.mkdir('out/resized')
     f = open('out/output.txt','w')
-    clauses, variables = ranGraph(3, 3, 20, 20, 5, 5 )   
+    clauses, variables = ranGraph(3, 3, 100, 100, 25, 25 )   
     print >>f, WID(clauses, variables, 100)
-    subprocess.call(["mogrify", "-path", "out/resized", "-resize", "1398x1060!", "out/*.png"])
+    subprocess.call(["mogrify", "-path", "out/resized", "-resize", "1920x1060", "out/*.png"])
     subprocess.call(["ffmpeg", "-r", "0.75", "-pattern_type", "glob", "-i", "out/resized/*.png", "-c:v", "copy", "out/slideshow.avi"])
-    subprocess.call(["vlc","out/slideshow.avi"])
-    
+   
+
     
 
 
@@ -660,3 +775,170 @@ if __name__== "__main__":
  #    c_a = Clause(1, [x1, x2], [-1, 1])
  #    c_b = Clause(2, [x2, x3], [-1, 1])
  #    c_c = Clause(3, [x3, x1], [-1, -1])
+
+
+
+
+ 
+
+
+# def clsPicker(nVar, nCls, varSamples):
+   
+#     nVarClssTot = 0
+#     nVarClssDic = {}
+    
+#     for var in varSamples:
+#         nVarClss = random.randrange(0, nCls + 1)
+#         print 'nVarClss', nVarClss
+#         nVarClssDic[var.name] = nVarClss
+#         print 'nVarClssDic', nVarClssDic
+#         nVarClssTot += nVarClss
+#         print 'nVarClssTot',nVarClssTot 
+
+#         if nVarClssTot > nCls:
+#             clsPicker(nVar, nCls, varSamples)
+#             print 'too many total clauses'
+#     else:
+    
+#         return nVarClssDic
+        
+        
+
+# def ranTree(kMin, kMax, cMin, cMax, vMin, vMax):
+
+    
+#     clauses = []
+#     variables = []
+#     possLevelVarPicks = []
+#     nVar = random.randint(vMin,vMax)
+#     nCls = random.randint(cMin,cMax)
+#     word = True
+#     curClauses = []
+#     print 'Nvars', nVar
+#     print 'Nclss', nCls
+#     print 'K', kMin, kMax
+    
+#     # generate number of connections
+#     print 'vSplits'
+#     while word == True:
+#         varSplits = []
+#         for i in range(nVar):
+#             varSplits.append(random.randrange(0, 3))
+#         print sum(varSplits), nCls-1
+#         if sum(varSplits) == nCls-1:
+#             break
+#     print 'varSplits',  varSplits
+    
+#     print 'clssplits'
+    
+#     while word == True:
+#         clsSplits = []
+#         for i in range(nCls):
+#             clsSplits.append(random.randrange(kMin - 1, kMax))
+#         print sum(clsSplits), nVar
+#         if sum(clsSplits) == nVar:
+#             break
+#     print clsSplits
+
+#     print  'nCls: ', nCls, 'nVar: ', nVar
+    
+#     for i in range(nVar):
+#         variables.append(Variable(i))
+        
+#     for var in variables:
+#         possLevelVarPicks.append(var)
+        
+#     varSplitCount = 0
+#     clsSplitCount = 0
+#     while clsSplitCount < nVar - 3:
+#     # init 1st clause
+#         clauses.append(Clause(0,[],[]))
+#         for clause in clauses:
+#             curClauses.append(clause)
+
+       
+#         nClsLeft = nCls - 1
+#         nLevelVars = []
+#         print 'should be empty', nLevelVars
+
+#         # first clause 
+#         if clsSplitCount == 0:
+#             nLevelVars.append(random.randrange(kMin,kMax+1))
+#             clsSplitCount +=1
+
+#         else:
+#             for clause in curClauses: 
+#                 nLevelVars.append(clsSplits[clsSplitCount - 1])
+#                 clsSplitCount += 1
+
+#         curVars = []
+
+#         for i in range(len(curClauses)):
+#             clauseVars = []
+#             print 'i', i
+
+#             print 'curclause', curClauses[i].name
+
+#             for n in range(nLevelVars[i]):
+#                 print 'n', n
+
+#                 curClauses[i].vars.append(possLevelVarPicks[i])
+#                 curVars.append(possLevelVarPicks[i])
+#                 print 'appended', possLevelVarPicks[i].name, 'to', curClauses[i].name
+#                 possLevelVarPicks.remove(possLevelVarPicks[i])
+#                 curClauses[i].edges.append(random.randrange(-1,2,2))
+
+#         # update clauses
+#         for curclause in curClauses:
+            
+#             for clause in clauses:
+                
+#                 if clause.name == curclause.name:
+#                     clause.vars = curclause.vars
+#                     clause.edges = curclause.edges
+                    
+#         print 'curvars'
+#         for i in curVars:
+#             print i.name
+            
+#         curClauses = []
+#         nLevelClsTot = 0
+#         nLevelCls = []
+        
+#         print 'should be empty', nLevelCls
+
+#         for var in curVars:
+#             nLevelCls.append(varSplits[varSplitCount])
+#             varSplitCount +=1
+            
+#         print 'nLevelClsTot'
+#         for i in nLevelCls:
+#             print i
+#         print 'nLevelCls', nLevelCls
+
+
+#         for i in range(len(curVars)):
+#             varsCls = []
+#             print 'i', i
+#             print 'curVar', curVars[i].name
+
+
+#             for n in range(nLevelCls[i]):
+
+#                 print 'n ', n
+#                 print 'clsSplitCount', clsSplitCount
+#                 print 'clauses'
+#                 for clause in clauses:
+#                     print clause.name
+
+#                 clauses.append(Clause(clsSplitCount, [],[])) #new generate clauses
+#                 print 'clause generated', clauses[clsSplitCount].name
+
+#                 clauses[clsSplitCount].vars.append(curVars[i])
+#                 print 'appended', curVars[i].name, 'to', clauses[clsSplitCount].name
+
+#                 curClauses.append(clauses[clsSplitCount])
+#                 clauses[clsSplitCount].edges.append(random.randrange(-1,2,2))
+#                 clsSplitCount += 1 
+#     return clauses, variables
+
