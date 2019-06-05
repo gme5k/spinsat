@@ -6,9 +6,11 @@ import matplotlib.pyplot as plt
 import subprocess
 import shutil
 import math
+import multiprocessing
+import numpy
+import graphviz
 
-
-  
+print numpy.log(0.38)
 class Clause:
 # input:
 #     string                       name
@@ -125,8 +127,262 @@ class Variable:
 
 
         
-def WID(clauses, variables, tmax):
+def belResults(clauses, variables, precision):
+    messages = belProp(clauses, 10000, precision)
+    belVars = []
+    probs = []
+    edges = messages.keys()
+   
     
+    print 'messages: '
+    for message in messages:
+        print messages[message]
+    print 'variables'
+    for i in variables:
+        print 'i', i.name
+        
+        negProd = 1.
+        posProd = 1.
+        
+        for edge in edges:
+            
+            if edge[1] == i:
+                a = edge[0]
+                
+                print 'a', a.name
+                
+                if a.getEdge(i) == 1:
+                    negProd *= (1 - messages[(a, i)])
+                    
+                elif a.getEdge(i) == -1:
+                    posProd *= (1 - messages[(a, i)])
+       
+            
+     
+        probTrue = negProd / (negProd + posProd)
+
+        probs.append([i.name, probTrue])
+        print '\n'
+   
+
+    # calculate entropy and N
+    cSum = 0.
+    
+    for a in clauses:
+        tendency_1 = 1.
+        tendency_2 = 1.
+        print 'clause: ', a.name
+        
+        for i in a.vars:
+            edgeVal_a_i = a.getEdge(i)
+            tendSat = 1.
+            tendUnsat = 1.
+            
+            print '\n variabale', i.name
+            
+            for edge in edges:
+               
+                # find b
+                if edge[1] == i and edge[0] != a:
+                
+                    b = edge[0]
+                    edgeVal_b_i =  b.getEdge(i)
+                    
+                    if edgeVal_b_i == edgeVal_a_i:
+                        tendSat *= (1.0 - messages[(b,i)])
+                      
+                    elif edgeVal_b_i == -1 * edgeVal_a_i:
+                        tendUnsat *= (1.0 - messages[(b,i)])
+                       
+                    print 'tendSat',tendSat
+                    print 'tendUnsat',tendUnsat
+            tendency_1 *= (tendSat + tendUnsat)
+           
+            tendency_2 *= tendUnsat
+            print 'tend1', tendency_1, 'tend2', tendency_2
+        tendSum = tendency_1 - tendency_2
+        print 'tendSum', tendSum
+        cSum += numpy.log(tendSum)
+    print 'cSum', cSum
+
+    vSum = 0.
+    for i in variables:
+        print 'variable: ', i.name
+        posProd = 1.0
+        negProd = 1.0
+        n_i = 0
+      
+        for edge in edges:
+
+            if edge[1] == i:
+                b = edge[0]
+                n_i += 1
+                edgeVal_b_i = b.getEdge(i)
+                
+                if edgeVal_b_i == -1:
+                 
+                    posProd *= (1.0 - messages[(b, i)])
+              
+                elif edgeVal_b_i == 1:
+                    negProd *= (1.0 - messages[(b, i)])
+        prodSum = posProd + negProd
+        lnSum = numpy.log(prodSum)
+        print 'prodSum', prodSum
+        print 'lnSum', lnSum
+        print 'degree', n_i
+        vSum += ((1 - n_i) * lnSum)
+        print 'vSum', vSum
+    # print 'vSum', vSum
+    # print '1 - len var',  1 - len(variables)
+    entropy = cSum + vSum
+    nStates = 2**len(variables)
+    nSatStates = numpy.exp(entropy)
+    fracSat = nSatStates / nStates
+    print >>f, 'entropy: ', entropy, 'nSATStates: ', nSatStates, 'nStates: ',\
+        nStates, 'fracSat: ', fracSat
+    print      'entropy: ', entropy, 'nSATStates: ', nSatStates, 'nStates: ',\
+        nStates, 'fracSat: ', fracSat
+
+    for i in range(len(probs)):
+        print >>f, probs[i]
+        print probs[i]
+        variables[i].val = round(probs[i][1], 2)
+    plotGraph(clauses, variables, 'belProp')
+        
+        
+def belProp(clauses, tmax, precision):
+    messages = {}
+    oldMessages = {}
+    vars = []
+    t = 0
+
+    # generate random messages u_a -> i, messages from clauses to variables
+    for a in clauses:
+
+        for i in a.vars:
+            messages[(a, i)] = float(random.randint(0,1))
+ 
+    print >>f, '\ninitial u_a - > i: '
+    print >>f, 'clause, variable, message value'
+    for message in messages:
+        print >>f, "c_"+str(message[0].name), "v_"+str(message[1].name), messages[message]
+
+    edges = messages.keys()
+    t += 1
+    
+    # while t < tmax, iterate over every edge in a random fashion and update
+    # warnings sequntially using the wpUpdate routine
+    while t < tmax:
+      
+        random.shuffle(edges)
+        
+        print >>f, '\nt = ', t
+
+        for edge in edges:
+            i = edge[1]
+            a = edge[0]
+
+            # store old warnings in similar dictionary to messages
+            oldMessages[(a,i)] = messages[(a,i)]
+            
+            # update varwarns with wpUpdate
+       
+            messages[(a,i)] = bpUpdate(edges, messages, a, i)
+        convergence = True
+        
+    
+        for i in messages:
+            print >>f,  "c_"+str(i[0].name), "v_"+str(i[1].name), messages[i]
+            print  "c_"+str(i[0].name), "v_"+str(i[1].name), messages[i]
+
+        # check for convergence
+        for message in messages:
+
+            print 'c', message[0].name, 'v',message[1].name, 'new: ', messages\
+                [message], 'old: ', oldMessages[message], 'diff: ',\
+                abs(messages[message] - oldMessages[message]), 't= ', t
+           
+            if abs(messages[message] - oldMessages[message]) > precision:
+                convergence = False
+       
+        # if converged return warnings
+        if convergence == True:
+            
+            print >>f, '\nconverged in  t = ', t
+            
+            return messages
+
+        # if not, and time is up, return uncovnerged
+        elif t == tmax:
+            return 'UNCONVERGED'
+        t += 1
+    
+# input: shuffled order of edges, warnings, edge a i
+# output: updated warning for edge a i
+def bpUpdate(edges, messages, a, i):
+    newMessage = 1.0
+    cavFields = {}
+    
+    # find (j) element of V(a)\i, i.e. the other variables attached to (a)
+    for edge in edges:
+
+        # if any (j) exists, set probabilities P^u_a->j, P^s_a -> j to 1
+        if edge[0] == a and edge[1] != i:
+
+            # print >>f, '    var (j) with matching clause to (a): ',\
+            #    edge[0].name, edge[1].name
+            
+            j = edge[1]
+            edgeVal_a_j = a.getEdge(j)
+            prob_u = 1.0
+            prob_s = 1.0
+            
+            # print 'j', j.name
+            
+            # compute cavity fields h_j -> a, messages from variables to
+            # clauses
+            for edge in edges:
+               
+                # find (b) element of V(j)\a, i.e. the other clauses besides
+                # (a) attached to (j)
+                if edge[1] == j and edge[0] != a: 
+                    b = edge[0]
+                    edgeVal_b_j = b.getEdge(j)
+                    
+                    # print 'b', b.name
+                    
+                    # print >>f, '        clause (b) with matching var to (j):\
+                    #',    edge[0].name, edge[1].name
+
+                    # if b element of V^s_a(j) multiply prob_s by
+                    # (1- message value)
+                    if edgeVal_a_j == edgeVal_b_j:
+                        
+                        # print ' edgeVal_a_j == edgeVal_b_j'
+                        # print 'message b j =' , messages[(b, j)]
+                        
+                        prob_s *= (1.0 - messages[(b, j)])
+                     
+                    # else if b element of V^u_a(j), multiply prob_u by
+                    # (1- message value)
+                    elif edgeVal_a_j == -1 * edgeVal_b_j:
+                        
+                        # print ' edgeVal_a_j !== edgeVal_b_j'
+                        # print 'message b j =' , messages[(b, j)]
+                        
+                        prob_u *= (1.0 - messages[(b, j)])
+     
+            # store cavity field and update new warning
+           
+         
+            
+            cavFields[(j,a)] = prob_u / (prob_u + prob_s)
+            newMessage *=  cavFields[(j,a)]
+    
+    return newMessage
+        
+        
+def WID(plot, clauses, variables, tmax):
     WIDvars = []
     locFieldCount = {}
 
@@ -135,16 +391,21 @@ def WID(clauses, variables, tmax):
         WIDvars.append(var)
     unfixedCount = len(WIDvars)
     WIDcycle = 0
-    plotGraph(clauses, variables, '0000')
+    
+    if plot == 0:
+        plotGraph(clauses, variables, '0000')
+        
     while unfixedCount > 0:
         
         locFieldCount[WIDcycle] = 0
+      
         messages = warnProp(clauses, tmax)
+      
         
         if messages == 'UN-CONVERGED':
             return 'UN-CONVERGED'
 
-        # only run if warnProp converges
+        # only run if wp converges
         else:
             edges = messages.keys()
             print >>f, '\nu*_a -> i'
@@ -156,7 +417,7 @@ def WID(clauses, variables, tmax):
             conNumbs = {}
             curVars = []
 
-            # make list of variables contained in warnings
+            # make list of unassignedd variables 
             for var in WIDvars:
                 if var.val == None:
                     curVars.append(var)
@@ -166,7 +427,7 @@ def WID(clauses, variables, tmax):
                 print >>f, var.name
             print >>f, '\nWIDcycle = ', WIDcycle, '\nN unfixed variables: '\
                 , unfixedCount
-
+            print WIDcycle
             # for every variable calculate local field and contradiction number
             for i in curVars:
                 
@@ -219,6 +480,7 @@ def WID(clauses, variables, tmax):
             for var in conNumbs:
 
                 if conNumbs[var] != 0:
+                    print 'UNSAT'
                     return 'UNSAT'
                 else:
                     pass
@@ -322,80 +584,23 @@ def WID(clauses, variables, tmax):
                 
         WIDcycle += 1
         imgName = (4  - len(str(WIDcycle))) * '0' + str(WIDcycle)
-        print 'later images', imgName
-        plotGraph(clauses, variables, imgName)
+       
+        if plot == 0:
+            print 'image', imgName
+            plotGraph(clauses, variables, imgName)
         
     print >>f, '\nall variables assigned in: ', WIDcycle, 'cycles. \n'
     print >>f, 'local fields processed: '
     for entry in locFieldCount:
         print >>f, entry, locFieldCount[entry]
    
+    if plot == 0:
+        WIDcycle +=1
+        imgName = (4  - len(str(WIDcycle))) * '0' + str(WIDcycle)
+        plotGraph(clauses, variables, imgName)
     return WIDvars
 
 
-
-
-
-def belProp(clauses, tmax, precision):
-    messages = {}
-    oldMessages = {}
-    vars = []
-    t = 0
-
-    # generate random messages u_a -> i, messages from clauses to variables
-    for a in clauses:
-
-        for i in a.vars:
-            messages[(a, i)] = random.randint(0,1)
- 
-    print >>f, '\ninitial u_a - > i: '
-    print >>f, 'clause, variable, message value'
-    for message in messages:
-        print >>f, "c_"+str(message[0].name), "v_"+str(message[1].name), messages[message]
-
-    edges = messages.keys()
-    t += 1
-    
-    # while t < tmax, iterate over every edge in a random fashion and update
-    # warnings sequntially using the wpUpdate routine
-    while t < tmax:
-      
-        random.shuffle(edges)
-        
-        print >>f, '\nt = ', t
-
-        for edge in edges:
-            i = edge[1]
-            a = edge[0]
-
-            # store old warnings in similar dictionary to messages
-            oldMessages[(a,i)] = messages[(a,i)]
-            
-            # update varwarns with wpUpdate
-       
-            messages[(a,i)] = bpUpdate(edges, messages, a, i)
-        convergence = 1
-        
-    
-        for i in messages:
-            print >>f,  "c_"+str(i[0].name), "v_"+str(i[1].name), messages[i]
-        # check for convergence
-        for message in messages:
-            
-            if abs(messages[message] - oldMessages[message]) < precision:
-                convergence = 0
-       
-        # if converged return warnings
-        if convergence == 1:
-            
-            print >>f, '\nconverged in  t = ', t
-            
-            return messages
-
-        # if not, and time is up, return uncovnerged
-        elif t == tmax:
-            return 'UNCONVERGED'
-        t += 1
 
 
         
@@ -439,7 +644,7 @@ def warnProp(clauses, tmax):
             # update varwarns with wpUpdate
        
             messages[(a,i)] = wpUpdate(edges, messages, a, i)
-        convergence = 1
+        convergence = True
         
         for i in messages:
             print >>f,  "c_"+str(i[0].name), "v_"+str(i[1].name), messages[i]
@@ -448,10 +653,10 @@ def warnProp(clauses, tmax):
         for message in messages:
         
             if messages[message] != oldMessages[message]:
-                convergence = 0
+                convergence = False
        
         # if converged return warnings
-        if convergence == 1:
+        if convergence == True:
             
             print >>f, '\nconverged in  t = ', t
             
@@ -463,64 +668,11 @@ def warnProp(clauses, tmax):
         t += 1
             
         
-# input: shuffled order of edges, warnings, edge a i
-# output: updated warning for edge a i
-def bpUpdate(edges, messages, a, i):
-    newVarWarn = 1
-    cavFields = {}
-    
-    # find (j) element of V(a)\i, i.e. the other variables attached to (a)
-    for edge in edges:
 
-        # if any (j) exists, set sums of warnings u_b -> j to 0
-        if edge[0] == a and edge[1] != i:
-
-            # print >>f, '    var (j) with matching clause to (a): ',edge[0].name,\
-            #     edge[1].name
-            
-            j = edge[1]
-            posEdgeVarWarnSum = 0
-            negEdgeVarWarnSum = 0
-            
-            # compute cavity fields h_j -> a, messages from variables to clauses
-            for edge in edges:
-
-                # find (b) element of V(j)\a, i.e. the other clauses besides (a)
-                # attached to (j)
-                if edge[1] == j and edge[0] != a:
-                    b = edge[0]
-                    edgeVal = b.getEdge(j)
-                    
-                    # print >>f, '        clause (b) with matching var to (j): ',\
-                    #     edge[0].name, edge[1].name
-
-                    # if edge value = -1 (solid line), add u_b -> j to
-                    # sum of warnings from un-negated variables
-                    if edgeVal == -1:
-                        posEdgeVarWarnSum += messages[(b,j)]
-                        
-                        # print >>f, '        edgeVal: ', edgeVal, ' posEdgeVarWarn: '\
-                        #     , messages[(b,j)]
-
-                    # else if edge value = 1 (dotted line), add u_b > j to
-                    # sum of warnings from negated variables
-                    elif edgeVal == 1:
-                        
-                        # print >>f,  '        edgeVal: ', edgeVal, 'negEdgeVarWarn: ',\
-                        #     messages[(b,j)]
-                        
-                        negEdgeVarWarnSum += messages[(b,j)]
-                        
-            # store cavity field and update new warning
-            cavFields[(j,a)] = posEdgeVarWarnSum - negEdgeVarWarnSum
-            newVarWarn *=  theta(cavFields[(j,a)] * a.getEdge(j))
-    
-    return newVarWarn
-        
 # input: shuffled order of edges, warnings, edge a i
 # output: updated warning for edge a i
 def wpUpdate(edges, messages, a, i):
-    newVarWarn = 1
+    newMessage = 1
     cavFields = {}
     
     # find (j) element of V(a)\i, i.e. the other variables attached to (a)
@@ -567,9 +719,9 @@ def wpUpdate(edges, messages, a, i):
                         
             # store cavity field and update new warning
             cavFields[(j,a)] = posEdgeVarWarnSum - negEdgeVarWarnSum
-            newVarWarn *=  theta(cavFields[(j,a)] * a.getEdge(j))
+            newMessage *=  theta(cavFields[(j,a)] * a.getEdge(j))
     
-    return newVarWarn
+    return newMessage
 
 
 
@@ -595,106 +747,86 @@ def ranGraph(kMin, kMax, cMin, cMax, vMin, vMax):
         variables.append(Variable(i))
    
     for clause in range(nCls):
-        # clsVars = []
-        # possVarPicks = []
         edgeVals = []
-        
-        # for var in variables:
-        #     possVarPicks.append(var) 
         ranVars = random.sample(variables, random.randrange(kMin, kMax + 1))
+        
         for ranVar in ranVars:
             edgeVals.append(random.randrange(-1,2,2))
-       
-        
-        # for j in range(random.randrange(kMin, kMax+1)):
-            # ranVar = random.choice(possVarPicks)
-            # clsVars.append(ranVar)
-            # possVarPicks.remove(ranVar)
-                    
+            # edgeVals.append(-1)
         clauses.append(Clause(clause, ranVars, edgeVals))
+    print >>f, 'c, v, e'
+    for clause in clauses:
+        for var in clause.vars:
+            print >>f,  clause.name, var.name, clause.getEdge(var)
+        
     return clauses, variables
 
-        
-    # for clause in range(nCls):
-    #     clsVars = []
-    #     possVarPicks = []
-    #     edgeVals = []
-        
-    #     for var in variables:
-    #         possVarPicks.append(var) 
-       
-    #     for j in range(random.randrange(kMin, kMax+1)):
-    #         ranVar = random.choice(possVarPicks)
-    #         clsVars.append(ranVar)
-    #         possVarPicks.remove(ranVar)
-    #         edgeVals.append(random.randrange(-1,2,2))
-    #     clauses.append(Clause(clause, clsVars, edgeVals))
-    # return clauses, variables
-    
-   
-    # for clause in range(nCls):
-    
-    #     possVarPicks = []
-    #     edgeVals = []
-    #     x =  random.randrange(0, len(variables) + 1)
-    #     print 'new clause, sampling x amount: ', x 
-    #     clsVars = random.sample(variables, x)
-
-    #     for i in clsVars:
-    #         print i.name
-
-    #     for i in clsVars:
-    #         variables.remove(i)
-       
-    #     print 'vars left \n'
-    #     for i in variables:
-    #         print i.name
-
-
-        
 def plotGraph(clauses, variables, imgName):
-  
-    G = networkx.Graph()
-    G.clear()
-    labels = {}
     
+    g = graphviz.Graph(format='png')
+    g.graph_attr.update(ranksep='3')
+
     for v in variables:
-        G.add_node(v, s = 'o')
-        labels[v] = 'V_'+str(v.name)+'\n'+str(v.val)
+        print 'vars', v.name
+        g.node('v '+str(v.name), 'v '+str(v.name)+'\n'+str(v.val),shape= 'circle')
 
     for c in clauses:
-        G.add_node(c, s = 's')
-        labels[c] = 'C_'+str(c.name)
-               
+        print 'clause', c.name
+        g.node('c '+str(c.name), shape= 'square')
+
         for i in range(len(c.vars)):
             
             if c.edges[i] == -1:
-                G.add_edge(c, c.vars[i], color = 'blue')
-            
+                g.edge('c '+str(c.name), 'v '+str(c.vars[i].name), color = 'blue')
+                
+                
             else:  
-                G.add_edge(c, c.vars[i], color = 'red')
-    colors = [G[u][v]['color'] for u,v in G.edges]
-    nodeShapes = set((aShape[1]["s"] for aShape in G.nodes(data=True)))
-    nodePos = networkx.kamada_kawai_layout(G)
+                g.edge('c '+str(c.name), 'v '+str(c.vars[i].name), color = 'red')
+              
+    g.render('out/'+imgName+'.gv', view=False)  
+# def plotGraph(clauses, variables, imgName):
+  
+#     G = networkx.Graph()
+#     G.clear()
+#     labels = {}
+    
+#     for v in variables:
+#         G.add_node(v, s = 'o')
+#         labels[v] = 'V_'+str(v.name)+'\n'+str(v.val)
 
-    for aShape in nodeShapes:
-        networkx.draw_networkx_nodes(
-            G, 
-            nodePos,
-            labels = labels,
-            with_labels = True, 
-            node_shape = aShape, 
-            node_color = 'white',
-            linewidths = 0.1,
-            node_size = 10, 
-            nodelist = [sNode[0] for sNode \
-                        in filter(lambda x: x[1]["s"] == aShape, G.nodes(data=True))]
-        )
-    networkx.draw_networkx_edges(G, nodePos, edge_color = colors, width = 0.1, alpha = 0.5)
-    networkx.draw_networkx_labels(G, nodePos, labels = labels, font_size = 1)
-    print 'name in plotGraph', imgName
-    plt.savefig('out/'+imgName+'.png', bbox_inches='tight', dpi = 700)
-    plt.clf()
+#     for c in clauses:
+#         G.add_node(c, s = 's')
+#         labels[c] = 'C_'+str(c.name)
+               
+#         for i in range(len(c.vars)):
+            
+#             if c.edges[i] == -1:
+#                 G.add_edge(c, c.vars[i], color = 'blue')
+            
+#             else:  
+#                 G.add_edge(c, c.vars[i], color = 'red')
+#     colors = [G[u][v]['color'] for u,v in G.edges]
+#     nodeShapes = set((aShape[1]["s"] for aShape in G.nodes(data=True)))
+#     nodePos = networkx.kamada_kawai_layout(G)
+
+#     for aShape in nodeShapes:
+#         networkx.draw_networkx_nodes(
+#             G, 
+#             nodePos,
+#             labels = labels,
+#             with_labels = True, 
+#             node_shape = aShape, 
+#             node_color = 'white',
+#             linewidths = 0.1,
+#             node_size = 10, 
+#             nodelist = [sNode[0] for sNode \
+#                         in filter(lambda x: x[1]["s"] == aShape, G.nodes(data=True))]
+#         )
+#     networkx.draw_networkx_edges(G, nodePos, edge_color = colors, width = 0.1, alpha = 0.5)
+#     networkx.draw_networkx_labels(G, nodePos, labels = labels, font_size = 1)
+#     print 'name in plotGraph', imgName
+#     plt.savefig('out/'+imgName+'.png', bbox_inches='tight', dpi = 700)
+#     plt.clf()
     
 if __name__== "__main__":
  
@@ -702,10 +834,30 @@ if __name__== "__main__":
     os.mkdir('out')
     os.mkdir('out/resized')
     f = open('out/output.txt','w')
-    clauses, variables = ranGraph(3, 3, 100, 100, 25, 25 )   
-    print >>f, WID(clauses, variables, 100)
-    subprocess.call(["mogrify", "-path", "out/resized", "-resize", "1920x1060", "out/*.png"])
-    subprocess.call(["ffmpeg", "-r", "0.75", "-pattern_type", "glob", "-i", "out/resized/*.png", "-c:v", "copy", "out/slideshow.avi"])
+    clauses, variables = ranGraph(3, 3, 40, 40, 10, 10);
+    # x1 = Variable(1
+    # x2 = Variable(2)
+    # x3 = Variable(3)
+    # x4 = Variable(4)
+    # x5 = Variable(5)
+    # x6 = Variable(6)
+    # x7 = Variable(7)
+    # x8 = Variable(8)
+    # c_a = Clause(1, [x1], [-1])
+    # c_b = Clause(2, [x2], [1])
+    # c_c = Clause(3, [x1, x2, x3], [1, -1, -1])
+    # c_d = Clause(4, [x3, x4], [1, -1])
+    # c_e = Clause(5, [x3, x5], [-1, -1])
+    # c_f = Clause(6, [x4], [-1])
+    # c_g = Clause(7, [x4, x7], [-1, 1])
+    # c_h = Clause(8, [x5, x8], [-1, -1])
+    # c_i = Clause(9, [x5, x6], [1, -1])
+    # clauses = [c_a, c_b, c_c, c_d, c_e, c_f, c_g, c_h, c_i]
+    # variables = [x1, x2, x3, x4, 5, 6, x7, x8]
+    # print >>f, belResults(clauses, variables, 0.0001)
+    print >>f, WID(0, clauses, variables, 100)
+    # subprocess.call(["mogrify", "-path", "out/resized", "-resize", "1920x1060", "out/*.png"])
+    # subprocess.call(["ffmpeg", "-r", "0.75", "-pattern_type", "glob", "-i", "out/resized/*.png", "-c:v", "copy", "out/slideshow.avi"])
    
 
     
@@ -717,7 +869,7 @@ if __name__== "__main__":
 
 
 
-
+#16:13
 
 
 
@@ -738,24 +890,25 @@ if __name__== "__main__":
 
 
     # Braunstein survey propogation paper Fig. 3
-# x1 = Variable(1)
-# x2 = Variable(2)
-# x3 = Variable(3)
-# x4 = Variable(4)
-# x5 = Variable(5)
-# x6 = Variable(6)
-# x7 = Variable(7)
-# x8 = Variable(8)
-# c_a = Clause(1, [x1], [-1])
-# c_b = Clause(2, [x2], [1])
-# c_c = Clause(3, [x1, x2, x3], [1, -1, -1])
-# c_d = Clause(4, [x3, x4], [1, -1])
-# c_e = Clause(5, [x3, x5], [-1, -1])
-# c_f = Clause(6, [x4], [-1])
-# c_g = Clause(7, [x4, x7], [-1, 1])
-# c_h = Clause(8, [x5, x8], [-1, -1])
-# c_i = Clause(9, [x5, x6], [1, -1])
-# fig3 = [c_a, c_b, c_c, c_d, c_e, c_f, c_g, c_h, c_i]
+x1 = Variable(1)
+x2 = Variable(2)
+x3 = Variable(3)
+x4 = Variable(4)
+x5 = Variable(5)
+x6 = Variable(6)
+x7 = Variable(7)
+x8 = Variable(8)
+c_a = Clause(1, [x1], [-1])
+c_b = Clause(2, [x2], [1])
+c_c = Clause(3, [x1, x2, x3], [1, -1, -1])
+c_d = Clause(4, [x3, x4], [1, -1])
+c_e = Clause(5, [x3, x5], [-1, -1])
+c_f = Clause(6, [x4], [-1])
+c_g = Clause(7, [x4, x7], [-1, 1])
+c_h = Clause(8, [x5, x8], [-1, -1])
+c_i = Clause(9, [x5, x6], [1, -1])
+# clauses = [c_a, c_b, c_c, c_d, c_e, c_f, c_g, c_h, c_i]
+# variables = [x1, x2, x3, x4, 5, 6, x7, x8]
 # c_z = Clause('z', [x1, x2, x3, x4, x5, x6, x7], [-1,-1, -1, -1, -1, -1, -1])
 #print 'clause z SAT-table: \n', c_z.generateSATtable(), '\n'
 #print 'fig. 3: '
@@ -941,4 +1094,3 @@ if __name__== "__main__":
 #                 clauses[clsSplitCount].edges.append(random.randrange(-1,2,2))
 #                 clsSplitCount += 1 
 #     return clauses, variables
-
