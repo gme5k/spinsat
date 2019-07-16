@@ -10,7 +10,8 @@ import multiprocessing
 import numpy
 import graphviz
 
-print numpy.log(0.38)
+
+
 class Clause:
 # input:
 #     string                       name
@@ -128,7 +129,7 @@ class Variable:
 
         
 def belResults(clauses, variables, precision):
-    messages = belProp(clauses, 10000, precision)
+    messages =  belProp(clauses, 10000, precision)
     belVars = []
     probs = []
     edges = messages.keys()
@@ -247,7 +248,7 @@ def belResults(clauses, variables, precision):
         print >>f, probs[i]
         print probs[i]
         variables[i].val = round(probs[i][1], 2)
-    plotGraph(clauses, variables, 'belProp')
+    plotGraph(clauses, variables, 'belProp', messages)
         
         
 def belProp(clauses, tmax, precision):
@@ -255,6 +256,7 @@ def belProp(clauses, tmax, precision):
     oldMessages = {}
     vars = []
     t = 0
+   
 
     # generate random messages u_a -> i, messages from clauses to variables
     for a in clauses:
@@ -262,10 +264,10 @@ def belProp(clauses, tmax, precision):
         for i in a.vars:
             messages[(a, i)] = float(random.randint(0,1))
  
-    print >>f, '\ninitial u_a - > i: '
-    print >>f, 'clause, variable, message value'
+    print '\ninitial u_a - > i: '
+    print 'clause, variable, message value'
     for message in messages:
-        print >>f, "c_"+str(message[0].name), "v_"+str(message[1].name), messages[message]
+        print "c_"+str(message[0].name), "v_"+str(message[1].name), messages[message]
 
     edges = messages.keys()
     t += 1
@@ -282,12 +284,11 @@ def belProp(clauses, tmax, precision):
             i = edge[1]
             a = edge[0]
 
-            # store old warnings in similar dictionary to messages
+            # store old warnings in similar dictionary as messages
             oldMessages[(a,i)] = messages[(a,i)]
             
-            # update varwarns with wpUpdate
-       
-            messages[(a,i)] = bpUpdate(edges, messages, a, i)
+            # update varwarns with wpUpdate        
+            messages[(a,i)]  = bpUpdate(edges, messages, a, i)
         convergence = True
         
     
@@ -322,10 +323,11 @@ def belProp(clauses, tmax, precision):
 def bpUpdate(edges, messages, a, i):
     newMessage = 1.0
     cavFields = {}
-    
+    print 'update ', 'c_'+str(a.name), 'v_'+str(i.name)
     # find (j) element of V(a)\i, i.e. the other variables attached to (a)
     for edge in edges:
-
+        prob_u = 1.0
+        prob_s = 1.0
         # if any (j) exists, set probabilities P^u_a->j, P^s_a -> j to 1
         if edge[0] == a and edge[1] != i:
 
@@ -334,10 +336,9 @@ def bpUpdate(edges, messages, a, i):
             
             j = edge[1]
             edgeVal_a_j = a.getEdge(j)
-            prob_u = 1.0
-            prob_s = 1.0
+           
             
-            # print 'j', j.name
+            print 'j', 'v_'+str(j.name)
             
             # compute cavity fields h_j -> a, messages from variables to
             # clauses
@@ -349,7 +350,7 @@ def bpUpdate(edges, messages, a, i):
                     b = edge[0]
                     edgeVal_b_j = b.getEdge(j)
                     
-                    # print 'b', b.name
+                    print 'b', 'c_'+str(b.name)
                     
                     # print >>f, '        clause (b) with matching var to (j):\
                     #',    edge[0].name, edge[1].name
@@ -361,7 +362,7 @@ def bpUpdate(edges, messages, a, i):
                         # print ' edgeVal_a_j == edgeVal_b_j'
                         # print 'message b j =' , messages[(b, j)]
                         
-                        prob_s *= (1.0 - messages[(b, j)])
+                        prob_u *= (1.0 - messages[(b, j)])
                      
                     # else if b element of V^u_a(j), multiply prob_u by
                     # (1- message value)
@@ -370,14 +371,22 @@ def bpUpdate(edges, messages, a, i):
                         # print ' edgeVal_a_j !== edgeVal_b_j'
                         # print 'message b j =' , messages[(b, j)]
                         
-                        prob_u *= (1.0 - messages[(b, j)])
+                        prob_s *= (1.0 - messages[(b, j)])
      
             # store cavity field and update new warning
            
          
-            
-            cavFields[(j,a)] = prob_u / (prob_u + prob_s)
+            print 'prob U',prob_u, 'prob S',prob_s
+
+            if prob_u != 0.:
+                cavFields[(j,a)] = prob_u / (prob_u + prob_s)
+
+            else:
+                cavFields[(j,a)] = 0.
+           
             newMessage *=  cavFields[(j,a)]
+    for key in cavFields:
+        print 'cav field', 'c_'+str(key[1].name), 'v_'+str(key[0].name), cavFields[key]
     
     return newMessage
         
@@ -761,8 +770,12 @@ def ranGraph(kMin, kMax, cMin, cMax, vMin, vMax):
         
     return clauses, variables
 
-def plotGraph(clauses, variables, imgName):
-    
+def plotGraph(clauses, variables, imgName, messages):
+    print 'here be messages', messages
+    for key in messages:
+        print key[0].name, key[1].name
+   
+
     g = graphviz.Graph(format='png')
     g.graph_attr.update(ranksep='3')
 
@@ -777,13 +790,15 @@ def plotGraph(clauses, variables, imgName):
         for i in range(len(c.vars)):
             
             if c.edges[i] == -1:
-                g.edge('c '+str(c.name), 'v '+str(c.vars[i].name), color = 'blue')
+                g.edge('c '+str(c.name), 'v '+str(c.vars[i].name), color = 'blue', \
+                       label=str( messages[(c,c.vars[i])] )[:5])
                 
                 
             else:  
-                g.edge('c '+str(c.name), 'v '+str(c.vars[i].name), color = 'red')
+                g.edge('c '+str(c.name), 'v '+str(c.vars[i].name), color = 'red', \
+                 label=str(messages[(c,c.vars[i])])[:5])
               
-    g.render('out/'+imgName+'.gv', view=False)  
+    g.render('out/'+imgName+'.gv', view=True)  
 # def plotGraph(clauses, variables, imgName):
   
 #     G = networkx.Graph()
@@ -827,15 +842,31 @@ def plotGraph(clauses, variables, imgName):
 #     print 'name in plotGraph', imgName
 #     plt.savefig('out/'+imgName+'.png', bbox_inches='tight', dpi = 700)
 #     plt.clf()
-    
+
+
+
+
+
+# Braunstein survey propogation paper Fig. 3
+braunVars = [Variable(1),Variable(2), Variable(3), Variable(4), Variable(5), \
+            Variable(6), Variable(7), Variable(8)]
+
+braunClauses = [Clause(1, [braunVars[0]], [-1]), Clause(2, [braunVars[1]], [1]), \
+                Clause(3, [braunVars[0], braunVars[1], braunVars[2]], [1, -1, -1]), Clause(4, [braunVars[2], braunVars[3]], [1, -1]), \
+                Clause(5, [braunVars[2], braunVars[4]], [-1, -1]), Clause(6, [braunVars[3]], [-1]), \
+                Clause(7, [braunVars[3], braunVars[6]], [-1, 1]), Clause(8, [braunVars[4], braunVars[7]], [-1, -1]), \
+                Clause(9, [braunVars[4], braunVars[5]], [1, -1])]
+
 if __name__== "__main__":
  
     shutil.rmtree('out')
     os.mkdir('out')
     os.mkdir('out/resized')
     f = open('out/output.txt','w')
-    clauses, variables = ranGraph(3, 3, 40, 40, 10, 10);
-    # x1 = Variable(1
+    clauses = braunClauses
+    variables = braunVars
+    # clauses, variables = ranGraph(3, 3, 40, 40, 10, 10)
+    # x1 = Variable(1)
     # x2 = Variable(2)
     # x3 = Variable(3)
     # x4 = Variable(4)
@@ -852,10 +883,9 @@ if __name__== "__main__":
     # c_g = Clause(7, [x4, x7], [-1, 1])
     # c_h = Clause(8, [x5, x8], [-1, -1])
     # c_i = Clause(9, [x5, x6], [1, -1])
-    # clauses = [c_a, c_b, c_c, c_d, c_e, c_f, c_g, c_h, c_i]
-    # variables = [x1, x2, x3, x4, 5, 6, x7, x8]
-    # print >>f, belResults(clauses, variables, 0.0001)
-    print >>f, WID(0, clauses, variables, 100)
+  
+    print >>f, belResults(clauses, variables, 0.000001)
+    # print >>f, WID(0, clauses, variables, 100)
     # subprocess.call(["mogrify", "-path", "out/resized", "-resize", "1920x1060", "out/*.png"])
     # subprocess.call(["ffmpeg", "-r", "0.75", "-pattern_type", "glob", "-i", "out/resized/*.png", "-c:v", "copy", "out/slideshow.avi"])
    
@@ -889,26 +919,6 @@ if __name__== "__main__":
 
 
 
-    # Braunstein survey propogation paper Fig. 3
-x1 = Variable(1)
-x2 = Variable(2)
-x3 = Variable(3)
-x4 = Variable(4)
-x5 = Variable(5)
-x6 = Variable(6)
-x7 = Variable(7)
-x8 = Variable(8)
-c_a = Clause(1, [x1], [-1])
-c_b = Clause(2, [x2], [1])
-c_c = Clause(3, [x1, x2, x3], [1, -1, -1])
-c_d = Clause(4, [x3, x4], [1, -1])
-c_e = Clause(5, [x3, x5], [-1, -1])
-c_f = Clause(6, [x4], [-1])
-c_g = Clause(7, [x4, x7], [-1, 1])
-c_h = Clause(8, [x5, x8], [-1, -1])
-c_i = Clause(9, [x5, x6], [1, -1])
-# clauses = [c_a, c_b, c_c, c_d, c_e, c_f, c_g, c_h, c_i]
-# variables = [x1, x2, x3, x4, 5, 6, x7, x8]
 # c_z = Clause('z', [x1, x2, x3, x4, x5, x6, x7], [-1,-1, -1, -1, -1, -1, -1])
 #print 'clause z SAT-table: \n', c_z.generateSATtable(), '\n'
 #print 'fig. 3: '
