@@ -152,9 +152,82 @@ class Variable:
         
 
 
+def sid(clauses, variables, precision):
+    messages =  belProp(clauses, 10000, precision, True)
+    plotGraph(clauses, variables, 'surProp', messages)
+
+def sp_update(edges, messages, a, i):
+
+    print 'a, i', a.name, i.name
+    newMessage = 1.0
+    cavFields = {}
+ 
+    for var in a.vars:
+        prob_u = 1.
+        prob_s = 1.
+        prob_0 = 1.
         
+        if var != i:
+            j = var
+            edgeVal_a_j = a.getEdge(j)
+
+            print '    a, j', a.name, j.name
+
+            for clause in j.clauses:
+                
+                if clause != a:
+                    b = clause
+                    edgeVal_b_j = j.getEdge(b)
+
+                    print '        b, j', b.name, j.name
+
+                    prob_0 *= (1. - messages[(b, j)])
+
+                    print '    prob_0', prob_0
+                    
+                    # if b element of V^s_a(j) multiply prob_s by
+                    # (1 - message value)
+                    if edgeVal_a_j == edgeVal_b_j:
+                        prob_u *= (1. - messages[(b, j)])
+                        
+                        print '    prob_u', prob_u
+                     
+                    # else if b element of V^u_a(j), multiply prob_u by
+                    # (1 - message value)
+                    elif edgeVal_a_j == -1. * edgeVal_b_j:
+                        prob_s *= (1. - messages[(b, j)])
+                        
+                        print '    prob_s', prob_s
+     
+            # store cavity field and update new warning
+            print 'j = ', j.name
+            
+            pi_u = (1 - prob_s) * prob_u
+            pi_s = (1 - prob_u) * prob_s
+            pi_0 = prob_0
+
+
+            
+            if prob_u != 0.:
+                cavFields[(j,a)] = prob_u / (prob_u + prob_s + prob_0)
+
+            elif prob_u == 0.:
+                cavFields[(j,a)] = 0.
+                
+            print 'appending to cavfieldsG in bpUpdate'
+            
+            cavFieldsG[(j,a)] = cavFields[(j,a)]
+                
+            print '    cav', a.name, j.name, cavFields[(j,a)], '\n'
+          
+            newMessage *=  cavFields[(j,a)]
+   
+    return newMessage
+        
+            
+    
 def belResults(clauses, variables, precision):
-    messages =  belProp(clauses, 10000, precision)
+    messages =  belProp(clauses, 10000, precision, True)
     belVars = []
     probs = []
     edges = messages.keys()
@@ -284,7 +357,7 @@ def belResults(clauses, variables, precision):
         variables[i].val = round(probs[i][1], 2)
     plotGraph(clauses, variables, 'belProp', messages)
     
-def belProp(clauses, tmax, precision):
+def belProp(clauses, tmax, precision, sid):
     messages = {}
     oldMessages = {}
     vars = []
@@ -319,8 +392,11 @@ def belProp(clauses, tmax, precision):
             # store old messages in similar dictionary as messages
             oldMessages[(a,i)] = messages[(a,i)]
             
-            # update messages with bpUpdate        
-            messages[(a,i)]  = bpUpdate(edges, messages, a, i)
+            # update messages with bpUpdate
+            if sid == True:
+                messages[(a,i)] = sp_update(edges, messages, a, i)
+            else:
+                messages[(a,i)]  = bpUpdate(edges, messages, a, i)
         convergence = True
 
         # check for convergence
@@ -394,20 +470,13 @@ def bpUpdate(edges, messages, a, i):
                 cavFields[(j,a)] = 0.
                 
             print 'appending to cavfieldsG in bpUpdate'
+            
             cavFieldsG[(j,a)] = cavFields[(j,a)]
                 
             print '    cav', a.name, j.name, cavFields[(j,a)], '\n'
-
-#####################################################3
-            #schrodinger's print statement
-            
-            for k in cavFieldsG:
-                print "cavfieldsG"    
-                print k, cavFieldsG[k]
-                ########################c###########
+          
             newMessage *=  cavFields[(j,a)]
    
-    
     return newMessage
         
         
@@ -906,30 +975,8 @@ braunClauses = [Clause(1, [braunVars[0]], [-1]), Clause(2, [braunVars[1]], [1]),
 for var in braunVars:
     for clause in braunClauses:
         if var in clause.vars:
-
-         
-       
             var.addClause(clause)
-            # print 'added', clause.name, 'to', var.name
 
-# for clause in braunClauses:
-#     print 'c', clause.name
-#     for var in clause.vars:
-#         print '    v', var.name
-#         print '    e', clause.getEdge(var)
-
-# for var in braunVars:
-#     print 'v', var.name
-#     for clause in var.clauses:
-#         print '    c', clause.name
-#         print '    e', var.getEdge(clause)
-
-
-# print braunClauses[0].getEdge(braunVars[0])
-# print 'name c', braunClauses[0].name
-# print 'name v', braunVars[0].name
-
-# print braunVars[0].getEdge(braunClauses[0])
 if __name__== "__main__":
  
     shutil.rmtree('out')
@@ -939,24 +986,6 @@ if __name__== "__main__":
     clauses = braunClauses
     variables = braunVars
     # clauses, variables = ranGraph(1, 2, 2, 2, 2, 2)
-    # x1 = Variable(1)
-    # x2 = Variable(2)
-    # x3 = Variable(3)
-    # x4 = Variable(4)
-    # x5 = Variable(5)
-    # x6 = Variable(6)
-    # x7 = Variable(7)
-    # x8 = Variable(8)
-    # c_a = Clause(1, [x1], [-1])
-    # c_b = Clause(2, [x2], [1])
-    # c_c = Clause(3, [x1, x2, x3], [1, -1, -1])
-    # c_d = Clause(4, [x3, x4], [1, -1])
-    # c_e = Clause(5, [x3, x5], [-1, -1])
-    # c_f = Clause(6, [x4], [-1])
-    # c_g = Clause(7, [x4, x7], [-1, 1])
-    # c_h = Clause(8, [x5, x8], [-1, -1])
-    # c_i = Clause(9, [x5, x6], [1, -1])
-  
     print >>f, belResults(clauses, variables, 0.000001)
     # print >>f, WID(0, clauses, variables, 100)
     # subprocess.call(["mogrify", "-path", "out/resized", "-resize", "1920x1060", "out/*.png"])
