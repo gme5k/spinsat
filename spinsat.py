@@ -10,7 +10,7 @@ import multiprocessing
 import numpy
 import graphviz
 
-
+cavFieldsG = {}
 
 class Clause:
 # input:
@@ -26,16 +26,14 @@ class Clause:
             
         assert len(vars) == len(edges), 'no equal amount of variables & edges'
         self.type = 'c'
-        self.edges = edges
         self.name = name
         self.vars = vars
         self.K = len(vars)
-        self.edgeDict = {}
+        self.edges = {}
 
         # combine variable objects and edges into key-value pairs
         for i in range(len(vars)):
-            self.edgeDict[self.vars[i]] = self.edges[i]
-
+            self.edges[vars[i]] = edges[i]
             
     def info(self):
         info = []
@@ -44,14 +42,18 @@ class Clause:
         print 'var, edge, val'
         
         for var in self.vars:
-            info.append([var.name, self.edgeDict[var], var.val])         
+            info.append([var.name, self.edges[var], var.val])         
         return info
 
     
     def getEdge(self, var):
-        return self.edgeDict[var]
+        return self.edges[var]
 
-
+    def addVar(self, var):
+        self.vars.append(var)
+        self.K += 1
+        self.edges[vars] = var.getEdge(self)
+        
     def checkSAT(self):
     # check if variables satisfy clause, returns 0 (SAT) or 2 (UNSAT)
 
@@ -121,10 +123,33 @@ class Variable:
 # input
 #     int     name
     
-    def __init__(self, name):
+    def __init__(self, name, clauses, edges):
+        
+        for edge in edges:
+            
+            assert edge == 1 or edge == -1, 'edge value has to be be 1 or -1'
+            
+        assert len(clauses) == len(edges), 'no equal amount of clauses & edges'
+
         self.type = 'v'
         self.name = name
         self.val = None
+        self.clauses = clauses
+        self.K = len(clauses)
+        self.edges = {}
+
+        # combine variable objects and edges into key-value pairs
+        for i in range(len(clauses)):
+            self.edges[clauses[i]] = edges[i]
+
+    def getEdge(self, clause):
+        return self.edges[clause]
+    
+    def addClause(self, clause):
+        self.clauses.append(clause)
+        self.K += 1
+        self.edges[clause] = clause.getEdge(self)
+        
 
 
         
@@ -133,13 +158,11 @@ def belResults(clauses, variables, precision):
     belVars = []
     probs = []
     edges = messages.keys()
-   
-    
-    print 'messages: '
-    for message in messages:
-        print messages[message]
+        
     print 'variables'
+    
     for i in variables:
+        
         print 'i', i.name
         
         negProd = 1.
@@ -159,11 +182,15 @@ def belResults(clauses, variables, precision):
                     posProd *= (1 - messages[(a, i)])
        
             
-     
-        probTrue = negProd / (negProd + posProd)
-
+  
+        if negProd != 0:   
+            probTrue = negProd / (negProd + posProd)
+            
+        else:
+            probTrue = 0
+            
         probs.append([i.name, probTrue])
-        print '\n'
+        
    
 
     # calculate entropy and N
@@ -172,14 +199,14 @@ def belResults(clauses, variables, precision):
     for a in clauses:
         tendency_1 = 1.
         tendency_2 = 1.
-        print 'clause: ', a.name
+        print '\n clause: ', a.name
         
         for i in a.vars:
             edgeVal_a_i = a.getEdge(i)
             tendSat = 1.
             tendUnsat = 1.
             
-            print '\n variabale', i.name
+            print '\n variable', i.name
             
             for edge in edges:
                
@@ -203,7 +230,8 @@ def belResults(clauses, variables, precision):
             print 'tend1', tendency_1, 'tend2', tendency_2
         tendSum = tendency_1 - tendency_2
         print 'tendSum', tendSum
-        cSum += numpy.log(tendSum)
+        if tendSum > 0:
+            cSum += numpy.log(tendSum)
     print 'cSum', cSum
 
     vSum = 0.
@@ -228,42 +256,46 @@ def belResults(clauses, variables, precision):
                     negProd *= (1.0 - messages[(b, i)])
         prodSum = posProd + negProd
         lnSum = numpy.log(prodSum)
+        
         print 'prodSum', prodSum
         print 'lnSum', lnSum
         print 'degree', n_i
+        
         vSum += ((1 - n_i) * lnSum)
+        
         print 'vSum', vSum
-    # print 'vSum', vSum
-    # print '1 - len var',  1 - len(variables)
+        
     entropy = cSum + vSum
     nStates = 2**len(variables)
     nSatStates = numpy.exp(entropy)
     fracSat = nSatStates / nStates
+    
     print >>f, 'entropy: ', entropy, 'nSATStates: ', nSatStates, 'nStates: ',\
         nStates, 'fracSat: ', fracSat
-    print      'entropy: ', entropy, 'nSATStates: ', nSatStates, 'nStates: ',\
+    print 'entropy: ', entropy, 'nSATStates: ', nSatStates, 'nStates: ',\
         nStates, 'fracSat: ', fracSat
 
+    print 'probability var is True '
     for i in range(len(probs)):
+        
         print >>f, probs[i]
         print probs[i]
+        
         variables[i].val = round(probs[i][1], 2)
     plotGraph(clauses, variables, 'belProp', messages)
-        
-        
+    
 def belProp(clauses, tmax, precision):
     messages = {}
     oldMessages = {}
     vars = []
     t = 0
    
-
     # generate random messages u_a -> i, messages from clauses to variables
     for a in clauses:
 
         for i in a.vars:
             messages[(a, i)] = float(random.randint(0,1))
- 
+
     print '\ninitial u_a - > i: '
     print 'clause, variable, message value'
     for message in messages:
@@ -284,17 +316,12 @@ def belProp(clauses, tmax, precision):
             i = edge[1]
             a = edge[0]
 
-            # store old warnings in similar dictionary as messages
+            # store old messages in similar dictionary as messages
             oldMessages[(a,i)] = messages[(a,i)]
             
-            # update varwarns with wpUpdate        
+            # update messages with bpUpdate        
             messages[(a,i)]  = bpUpdate(edges, messages, a, i)
         convergence = True
-        
-    
-        for i in messages:
-            print >>f,  "c_"+str(i[0].name), "v_"+str(i[1].name), messages[i]
-            print  "c_"+str(i[0].name), "v_"+str(i[1].name), messages[i]
 
         # check for convergence
         for message in messages:
@@ -321,72 +348,65 @@ def belProp(clauses, tmax, precision):
 # input: shuffled order of edges, warnings, edge a i
 # output: updated warning for edge a i
 def bpUpdate(edges, messages, a, i):
+    print 'a, i', a.name, i.name
     newMessage = 1.0
     cavFields = {}
-    print 'update ', 'c_'+str(a.name), 'v_'+str(i.name)
-    # find (j) element of V(a)\i, i.e. the other variables attached to (a)
-    for edge in edges:
-        prob_u = 1.0
-        prob_s = 1.0
-        # if any (j) exists, set probabilities P^u_a->j, P^s_a -> j to 1
-        if edge[0] == a and edge[1] != i:
-
-            # print >>f, '    var (j) with matching clause to (a): ',\
-            #    edge[0].name, edge[1].name
-            
-            j = edge[1]
+ 
+    for var in a.vars:
+        prob_u = 1.
+        prob_s = 1.
+        
+        if var != i:
+            j = var
             edgeVal_a_j = a.getEdge(j)
-           
-            
-            print 'j', 'v_'+str(j.name)
-            
-            # compute cavity fields h_j -> a, messages from variables to
-            # clauses
-            for edge in edges:
-               
-                # find (b) element of V(j)\a, i.e. the other clauses besides
-                # (a) attached to (j)
-                if edge[1] == j and edge[0] != a: 
-                    b = edge[0]
-                    edgeVal_b_j = b.getEdge(j)
-                    
-                    print 'b', 'c_'+str(b.name)
-                    
-                    # print >>f, '        clause (b) with matching var to (j):\
-                    #',    edge[0].name, edge[1].name
 
+            print '    a, j', a.name, j.name
+
+            for clause in j.clauses:
+                
+                if clause != a:
+                    b = clause
+                    edgeVal_b_j = j.getEdge(b)
+
+                    print '        b, j', b.name, j.name
+                        
                     # if b element of V^s_a(j) multiply prob_s by
-                    # (1- message value)
+                    # (1 - message value)
                     if edgeVal_a_j == edgeVal_b_j:
+                        prob_u *= (1. - messages[(b, j)])
                         
-                        # print ' edgeVal_a_j == edgeVal_b_j'
-                        # print 'message b j =' , messages[(b, j)]
-                        
-                        prob_u *= (1.0 - messages[(b, j)])
+                        print '    prob_u', prob_u
                      
                     # else if b element of V^u_a(j), multiply prob_u by
-                    # (1- message value)
-                    elif edgeVal_a_j == -1 * edgeVal_b_j:
+                    # (1 - message value)
+                    elif edgeVal_a_j == -1. * edgeVal_b_j:
+                        prob_s *= (1. - messages[(b, j)])
                         
-                        # print ' edgeVal_a_j !== edgeVal_b_j'
-                        # print 'message b j =' , messages[(b, j)]
-                        
-                        prob_s *= (1.0 - messages[(b, j)])
+                        print '    prob_s', prob_s
      
             # store cavity field and update new warning
-           
-         
-            print 'prob U',prob_u, 'prob S',prob_s
-
+            print 'j = ', j.name
+            
             if prob_u != 0.:
                 cavFields[(j,a)] = prob_u / (prob_u + prob_s)
 
-            else:
+            elif prob_u == 0.:
                 cavFields[(j,a)] = 0.
-           
+                
+            print 'appending to cavfieldsG in bpUpdate'
+            cavFieldsG[(j,a)] = cavFields[(j,a)]
+                
+            print '    cav', a.name, j.name, cavFields[(j,a)], '\n'
+
+#####################################################3
+            #schrodinger's print statement
+            
+            for k in cavFieldsG:
+                print "cavfieldsG"    
+                print k, cavFieldsG[k]
+                ########################c###########
             newMessage *=  cavFields[(j,a)]
-    for key in cavFields:
-        print 'cav field', 'c_'+str(key[1].name), 'v_'+str(key[0].name), cavFields[key]
+   
     
     return newMessage
         
@@ -763,43 +783,69 @@ def ranGraph(kMin, kMax, cMin, cMax, vMin, vMax):
             edgeVals.append(random.randrange(-1,2,2))
             # edgeVals.append(-1)
         clauses.append(Clause(clause, ranVars, edgeVals))
+        
     print >>f, 'c, v, e'
+    
     for clause in clauses:
         for var in clause.vars:
+            
             print >>f,  clause.name, var.name, clause.getEdge(var)
         
     return clauses, variables
 
 def plotGraph(clauses, variables, imgName, messages):
-    print 'here be messages', messages
-    for key in messages:
-        print key[0].name, key[1].name
+    print 'plotgraph: printing cavity fields G'
+    
+    for i in cavFieldsG:
+        
+        print 'cavFieldsG entry: ', i[1].name, i[0].name, cavFieldsG[i]
+        
    
+        
+    print 'plotgraph: messages'
+    
+    for key in messages:
+        
+        print key[0].name, key[1].name, messages[key]
 
     g = graphviz.Graph(format='png')
     g.graph_attr.update(ranksep='3')
 
     for v in variables:
-        print 'vars', v.name
         g.node('v '+str(v.name), 'v '+str(v.name)+'\n'+str(v.val),shape= 'circle')
-
+    print 'plotgraph: cavity fields'
     for c in clauses:
-        print 'clause', c.name
         g.node('c '+str(c.name), shape= 'square')
+        
+     
+    
+        for var in c.vars:
+           
+            if  cavFieldsG.get((var, c)) != None:
+               
+                print 'c',c.name,'v', var.name, cavFieldsG[(var,c)]
 
-        for i in range(len(c.vars)):
-            
-            if c.edges[i] == -1:
-                g.edge('c '+str(c.name), 'v '+str(c.vars[i].name), color = 'blue', \
-                       label=str( messages[(c,c.vars[i])] )[:5])
-                
-                
-            else:  
-                g.edge('c '+str(c.name), 'v '+str(c.vars[i].name), color = 'red', \
-                 label=str(messages[(c,c.vars[i])])[:5])
-              
+                if c.getEdge(var) == -1:
+                    g.edge('c ' + str(c.name), 'v '+str(var.name), color = 'blue', \
+                               label = str(messages[(c, var)])[:5]  + '\n' + \
+                                str(cavFieldsG[(var, c)])[:5])
+
+                else:  
+                    g.edge('c ' + str(c.name), 'v '+str(var.name), color = 'red', \
+                               label = str(messages[(c,var)])[:5] + '\n' + \
+                                str(cavFieldsG[(var, c)])[:5])
+            else:
+                print c.name, var.name, 'does not have a cavity field'
+
+                if c.getEdge(var) == -1:
+                    g.edge('c ' + str(c.name), 'v '+str(var.name), color = 'blue', \
+                               label = str(messages[(c,var)])[:5])
+
+                else:  
+                    g.edge('c ' + str(c.name), 'v '+str(var.name), color = 'red', \
+                               label = str(messages[(c,var)])[:5])              
     g.render('out/'+imgName+'.gv', view=True)  
-# def plotGraph(clauses, variables, imgName):
+# def plotGraph(clauses, variables, imgName): 
   
 #     G = networkx.Graph()
 #     G.clear()
@@ -848,8 +894,8 @@ def plotGraph(clauses, variables, imgName, messages):
 
 
 # Braunstein survey propogation paper Fig. 3
-braunVars = [Variable(1),Variable(2), Variable(3), Variable(4), Variable(5), \
-            Variable(6), Variable(7), Variable(8)]
+braunVars = [Variable(1, [], []),Variable(2, [], []), Variable(3, [], []), Variable(4, [], []), Variable(5, [], []), \
+            Variable(6, [], []), Variable(7, [], []), Variable(8, [], [])]
 
 braunClauses = [Clause(1, [braunVars[0]], [-1]), Clause(2, [braunVars[1]], [1]), \
                 Clause(3, [braunVars[0], braunVars[1], braunVars[2]], [1, -1, -1]), Clause(4, [braunVars[2], braunVars[3]], [1, -1]), \
@@ -857,6 +903,33 @@ braunClauses = [Clause(1, [braunVars[0]], [-1]), Clause(2, [braunVars[1]], [1]),
                 Clause(7, [braunVars[3], braunVars[6]], [-1, 1]), Clause(8, [braunVars[4], braunVars[7]], [-1, -1]), \
                 Clause(9, [braunVars[4], braunVars[5]], [1, -1])]
 
+for var in braunVars:
+    for clause in braunClauses:
+        if var in clause.vars:
+
+         
+       
+            var.addClause(clause)
+            # print 'added', clause.name, 'to', var.name
+
+# for clause in braunClauses:
+#     print 'c', clause.name
+#     for var in clause.vars:
+#         print '    v', var.name
+#         print '    e', clause.getEdge(var)
+
+# for var in braunVars:
+#     print 'v', var.name
+#     for clause in var.clauses:
+#         print '    c', clause.name
+#         print '    e', var.getEdge(clause)
+
+
+# print braunClauses[0].getEdge(braunVars[0])
+# print 'name c', braunClauses[0].name
+# print 'name v', braunVars[0].name
+
+# print braunVars[0].getEdge(braunClauses[0])
 if __name__== "__main__":
  
     shutil.rmtree('out')
@@ -865,7 +938,7 @@ if __name__== "__main__":
     f = open('out/output.txt','w')
     clauses = braunClauses
     variables = braunVars
-    # clauses, variables = ranGraph(3, 3, 40, 40, 10, 10)
+    # clauses, variables = ranGraph(1, 2, 2, 2, 2, 2)
     # x1 = Variable(1)
     # x2 = Variable(2)
     # x3 = Variable(3)
