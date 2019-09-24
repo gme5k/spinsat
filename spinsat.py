@@ -21,7 +21,6 @@ class Clause:
     def __init__(self, name, vars, edges):
 
         for edge in edges:
-            
             assert edge == 1 or edge == -1, 'edge value has to be be 1 or -1'
             
         assert len(vars) == len(edges), 'no equal amount of variables & edges'
@@ -42,9 +41,9 @@ class Clause:
         print 'var, edge, val'
         
         for var in self.vars:
-            info.append([var.name, self.edges[var], var.val])         
+            info.append([var.name, self.edges[var], var.val])
+            
         return info
-
     
     def getEdge(self, var):
         return self.edges[var]
@@ -64,15 +63,16 @@ class Clause:
         # calculate edge * value
         empty = True 
         for var in self.vars:
-            
             if var.val != None:
                 empty = False
                 edgeValProducts.append(var.val * self.getEdge(var))
 
                 if var.val * self.getEdge(var) == -1:
-                    print >>f, 'variable: ', var.name, 'SAT'
+                    
+                    print 'variable: ', var.name, 'SAT'
+                    
                 else:
-                    print >>f, 'variable: ', var.name, 'UNSAT' 
+                    print 'variable: ', var.name, 'UNSAT' 
 
         # sat = 0 if at least one variable satisfies clause, else sat = 2
         # [mezard K-SAT paper eq. 5]
@@ -82,12 +82,14 @@ class Clause:
         
         else:
             sat = 1
+            
             for i in edgeValProducts:
                 sat *= (1 + i) / 2.0
 
                 # if one variable satisfies, do not calculate others
                 if sat == 0:
                     break
+                
             return int(2 * sat)
         
             
@@ -105,7 +107,6 @@ class Clause:
             # set var. values to generated values
             for i in range(len(valSet)):
                 self.vars[i].val = valSet[i]
-
             table.append([valSet, self.checkSAT()])
        
         # return '0 = sat, 2 = unsat'
@@ -126,7 +127,6 @@ class Variable:
     def __init__(self, name, clauses, edges):
         
         for edge in edges:
-            
             assert edge == 1 or edge == -1, 'edge value has to be be 1 or -1'
             
         assert len(clauses) == len(edges), 'no equal amount of clauses & edges'
@@ -149,16 +149,53 @@ class Variable:
         self.clauses.append(clause)
         self.K += 1
         self.edges[clause] = clause.getEdge(self)
-        
 
 
 def sid(clauses, variables, precision):
-    messages =  belProp(clauses, 10000, precision, True)
-    plotGraph(clauses, variables, 'surProp', messages)
+     
+    messages =  belResults(clauses, variables, 0.0000001, True)
+    trivial = True
+    
+    for message in messages:
+        if message != 0.:
+            trivial = False
+            
+    if trivial == False:
+        variance = []
+        for i in variables:
+            prod_v_plus = 1.
+            prod_v_min = 1.
+            prod_v_0 = 1.
+            
+            for a in i.clauses:
+                prod_v_0 *= (1 - messages[(a, i)])
+                
+                if a.getEdge(i) == 1:
+                    prod_v_min *= (1 - messages[(a, i)])
+                
+                elif a.getEdge(i) == -1:
+                    prod_v_plus *= (1 - messages[(a, i)])
+            pi_plus = (1 - prod_v_plus) * prod_v_min
+            pi_min = (1 - prod_v_min) * prod_v_plus
+            pi_0 = prod_v_0
 
+            w_plus = pi_plus / (pi_plus + pi_min + pi_0)
+            w_min = pi_min / (pi_plus + pi_min + pi_0)
+            w_0 = 1 - w_plus - w_min
+            
+            variance.append((i, w_plus, w_min))
+        for k in variance:
+            print k[0].name, k[1], k[2], abs(k[1] - k[2])
+        print 'gap'
+        variance.sort(key = lambda x: abs(x[1] - x[2]), reverse = True)
+        for k in variance:
+            print k[0].name, k[1], k[2], abs(k[1] - k[2])
+
+            
 def sp_update(edges, messages, a, i):
 
     print 'a, i', a.name, i.name
+    
     newMessage = 1.0
     cavFields = {}
  
@@ -174,7 +211,6 @@ def sp_update(edges, messages, a, i):
             print '    a, j', a.name, j.name
 
             for clause in j.clauses:
-                
                 if clause != a:
                     b = clause
                     edgeVal_b_j = j.getEdge(b)
@@ -205,13 +241,11 @@ def sp_update(edges, messages, a, i):
             pi_u = (1 - prob_s) * prob_u
             pi_s = (1 - prob_u) * prob_s
             pi_0 = prob_0
-
-
             
-            if prob_u != 0.:
+            if prob_u != 0:
                 cavFields[(j,a)] = prob_u / (prob_u + prob_s + prob_0)
 
-            elif prob_u == 0.:
+            else:
                 cavFields[(j,a)] = 0.
                 
             print 'appending to cavfieldsG in bpUpdate'
@@ -224,10 +258,13 @@ def sp_update(edges, messages, a, i):
    
     return newMessage
         
-            
-    
-def belResults(clauses, variables, precision):
-    messages =  belProp(clauses, 10000, precision, True)
+def belResults(clauses, variables, precision, sid):
+    if sid == True:
+        messages =  belProp(clauses, 10000, precision, True)
+        
+    else:
+        messages = belProp(clauses, 10000, precision, False)
+        
     belVars = []
     probs = []
     edges = messages.keys()
@@ -241,27 +278,21 @@ def belResults(clauses, variables, precision):
         negProd = 1.
         posProd = 1.
         
-        for edge in edges:
+        for a in i.clauses: 
             
-            if edge[1] == i:
-                a = edge[0]
+            print 'a', a.name
+            
+            if a.getEdge(i) == 1:
+                negProd *= (1 - messages[(a, i)])
                 
-                print 'a', a.name
-                
-                if a.getEdge(i) == 1:
-                    negProd *= (1 - messages[(a, i)])
-                    
-                elif a.getEdge(i) == -1:
-                    posProd *= (1 - messages[(a, i)])
+            elif a.getEdge(i) == -1:
+                posProd *= (1 - messages[(a, i)])
        
-            
-  
-        if negProd != 0:   
+        if negProd != 0:  
             probTrue = negProd / (negProd + posProd)
             
         else:
-            probTrue = 0
-            
+            probTrue = 0.
         probs.append([i.name, probTrue])
         
    
@@ -280,13 +311,9 @@ def belResults(clauses, variables, precision):
             tendUnsat = 1.
             
             print '\n variable', i.name
-            
-            for edge in edges:
-               
-                # find b
-                if edge[1] == i and edge[0] != a:
-                
-                    b = edge[0]
+
+            for b in i.clauses:
+                if b != a:
                     edgeVal_b_i =  b.getEdge(i)
                     
                     if edgeVal_b_i == edgeVal_a_i:
@@ -297,36 +324,39 @@ def belResults(clauses, variables, precision):
                        
                     print 'tendSat',tendSat
                     print 'tendUnsat',tendUnsat
+                    
             tendency_1 *= (tendSat + tendUnsat)
-           
             tendency_2 *= tendUnsat
+            
             print 'tend1', tendency_1, 'tend2', tendency_2
+            
         tendSum = tendency_1 - tendency_2
+        
         print 'tendSum', tendSum
+        
         if tendSum > 0:
             cSum += numpy.log(tendSum)
+            
     print 'cSum', cSum
 
     vSum = 0.
     for i in variables:
+        
         print 'variable: ', i.name
+        
         posProd = 1.0
         negProd = 1.0
         n_i = 0
       
-        for edge in edges:
+        for b in i.clauses:
+            n_i += 1
+            edgeVal_b_i = b.getEdge(i)
 
-            if edge[1] == i:
-                b = edge[0]
-                n_i += 1
-                edgeVal_b_i = b.getEdge(i)
-                
-                if edgeVal_b_i == -1:
-                 
-                    posProd *= (1.0 - messages[(b, i)])
-              
-                elif edgeVal_b_i == 1:
-                    negProd *= (1.0 - messages[(b, i)])
+            if edgeVal_b_i == -1:
+                posProd *= (1.0 - messages[(b, i)])
+
+            elif edgeVal_b_i == 1:
+                negProd *= (1.0 - messages[(b, i)])
         prodSum = posProd + negProd
         lnSum = numpy.log(prodSum)
         
@@ -347,8 +377,8 @@ def belResults(clauses, variables, precision):
         nStates, 'fracSat: ', fracSat
     print 'entropy: ', entropy, 'nSATStates: ', nSatStates, 'nStates: ',\
         nStates, 'fracSat: ', fracSat
-
     print 'probability var is True '
+    
     for i in range(len(probs)):
         
         print >>f, probs[i]
@@ -356,6 +386,8 @@ def belResults(clauses, variables, precision):
         
         variables[i].val = round(probs[i][1], 2)
     plotGraph(clauses, variables, 'belProp', messages)
+    return messages
+    
     
 def belProp(clauses, tmax, precision, sid):
     messages = {}
@@ -367,7 +399,7 @@ def belProp(clauses, tmax, precision, sid):
     for a in clauses:
 
         for i in a.vars:
-            messages[(a, i)] = float(random.randint(0,1))
+            messages[(a, i)] = random.randrange(0,1000001, 1) / 10**6
 
     print '\ninitial u_a - > i: '
     print 'clause, variable, message value'
@@ -395,6 +427,7 @@ def belProp(clauses, tmax, precision, sid):
             # update messages with bpUpdate
             if sid == True:
                 messages[(a,i)] = sp_update(edges, messages, a, i)
+                
             else:
                 messages[(a,i)]  = bpUpdate(edges, messages, a, i)
         convergence = True
@@ -412,7 +445,7 @@ def belProp(clauses, tmax, precision, sid):
         # if converged return warnings
         if convergence == True:
             
-            print >>f, '\nconverged in  t = ', t
+            print '\nconverged in  t = ', t
             
             return messages
 
@@ -526,6 +559,7 @@ def WID(plot, clauses, variables, tmax):
             print >>f, '\nWIDcycle = ', WIDcycle, '\nN unfixed variables: '\
                 , unfixedCount
             print WIDcycle
+            
             # for every variable calculate local field and contradiction number
             for i in curVars:
                 
@@ -576,10 +610,10 @@ def WID(plot, clauses, variables, tmax):
 
             # check if fig is UNSAT with contradiction numbers
             for var in conNumbs:
-
                 if conNumbs[var] != 0:
                     print 'UNSAT'
                     return 'UNSAT'
+                
                 else:
                     pass
 
@@ -588,7 +622,6 @@ def WID(plot, clauses, variables, tmax):
             locFieldPresent = False
     
             for var in curVars:
-
                 if locFields[var] > 0:
                     locFieldCount[WIDcycle] += 1
                     locFieldPresent = True
@@ -611,12 +644,13 @@ def WID(plot, clauses, variables, tmax):
 
             # if no local fields, set random var to random var value
             if locFieldPresent ==  False:
-               
                 ranVar = random.choice(curVars)
                 ranVal = random.randrange(-1, 2, 2)
                 ranVar.val = ranVal
+                
                 print >>f, 'no local fields, doing something random'
                 print >>f, ranVar.name, ranVal
+                
                 unfixedCount -= 1
             
             # clean figure
@@ -986,7 +1020,8 @@ if __name__== "__main__":
     clauses = braunClauses
     variables = braunVars
     # clauses, variables = ranGraph(1, 2, 2, 2, 2, 2)
-    print >>f, belResults(clauses, variables, 0.000001)
+    sid(clauses, variables, 0.0000001)
+   
     # print >>f, WID(0, clauses, variables, 100)
     # subprocess.call(["mogrify", "-path", "out/resized", "-resize", "1920x1060", "out/*.png"])
     # subprocess.call(["ffmpeg", "-r", "0.75", "-pattern_type", "glob", "-i", "out/resized/*.png", "-c:v", "copy", "out/slideshow.avi"])
@@ -997,6 +1032,7 @@ if __name__== "__main__":
 
 
 
+   
 
 
 
