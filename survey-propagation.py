@@ -8,6 +8,7 @@ import shutil
 import math
 import numpy
 import time
+import graphviz
 
 cavFieldsG = {}
 
@@ -15,7 +16,6 @@ def sid(clauses, variables, precision, t_max):
     cycle = 0
     vars_unfix = set()
 
-   
     for var in variables:
         if var.val == None:
             vars_unfix.add(var)
@@ -84,11 +84,13 @@ def sid(clauses, variables, precision, t_max):
                 if variance[0][1] > variance[0][2]:
                     variance[0][0].val = 1
                     vars_unfix.remove(variance[0][0])
+                    
                     print 'var', variance[0][0].name, 'val', variance[0][0].val
 
                 else:
                     variance[0][0].val = -1
                     vars_unfix.remove(variance[0][0])
+                    
                     print 'var', variance[0][0].name, 'val', variance[0][0].val
 
                 print '\nsat check'
@@ -100,9 +102,13 @@ def sid(clauses, variables, precision, t_max):
                 ran_var = random.choice(list(vars_unfix))
                 ran_var.val =  random.randrange(-1, 2, 2)
                 vars_unfix.remove(ran_var)
+                
                 print 'v', ran_var.name, 'val', ran_var.val
-            decimate(clauses) 
+            plotGraph(clauses, variables, str(cycle), messages)
+            decimate(clauses)
+            
         cycle +=1
+        
     return vars_unfix
                     
 def sur_prop(clauses, t_max, precision):
@@ -261,9 +267,7 @@ class Clause:
     
     def getEdge(self, var):
             return self.vars[var]
-
-           
-
+        
     def addVar(self, var, edge):
         self.vars[var] = edge
         self.K += 1
@@ -375,6 +379,56 @@ def sat_loader(es):
     
     return cs_out, vs_out
 
+def plotGraph(clauses, variables, imgName, messages):
+    print 'plotgraph: printing cavity fields G'
+    
+    for i in cavFieldsG:
+        
+        print 'cavFieldsG entry: ', i[1].name, i[0].name, cavFieldsG[i]
+        
+   
+        
+    print 'plotgraph: messages'
+    
+    for key in messages:
+        
+        print key[0].name, key[1].name, messages[key]
+
+    g = graphviz.Graph(format='png')
+    g.graph_attr.update(ranksep='3')
+
+    for v in variables:
+        g.node('v '+str(v.name), 'v '+str(v.name)+'\n'+str(v.val),shape= 'circle')
+    print 'plotgraph: cavity fields'
+    for c in clauses:
+        g.node('c '+str(c.name), shape= 'square')
+        
+        for var in c.vars:
+           
+            if  cavFieldsG.get((var, c)) != None:
+               
+                print 'c',c.name,'v', var.name, cavFieldsG[(var,c)]
+
+                if c.getEdge(var) == -1:
+                    g.edge('c ' + str(c.name), 'v '+str(var.name), color = 'blue', \
+                               label = 'm'+str(messages[(c, var)])[:5]  + '\n' + \
+                                'c'+str(cavFieldsG[(var, c)])[:5])
+
+                else:  
+                    g.edge('c ' + str(c.name), 'v '+str(var.name), color = 'red', \
+                               label = 'm'+str(messages[(c,var)])[:5] + '\n' + \
+                                'c'+str(cavFieldsG[(var, c)])[:5])
+            else:
+                print c.name, var.name, 'does not have a cavity field'
+
+                if c.getEdge(var) == -1:
+                    g.edge('c ' + str(c.name), 'v '+str(var.name), color = 'blue', \
+                               label = str(messages[(c,var)])[:5])
+
+                else:  
+                    g.edge('c ' + str(c.name), 'v '+str(var.name), color = 'red', \
+                               label = str(messages[(c,var)])[:5])              
+    g.render('out/'+imgName+'.gv', view=True)  
 if __name__== "__main__":
    
      
