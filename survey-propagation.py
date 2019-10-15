@@ -14,9 +14,22 @@ cavFieldsG = {}
 def sid(clauses, variables, precision, t_max):
     cycle = 0
     vars_unfix = set()
+
+   
     for var in variables:
-        vars_unfix.add(var)
+        if var.val == None:
+            vars_unfix.add(var)
+    
     while len(vars_unfix) > 0:
+      
+        for c in clauses:
+            print 'c', c.name
+            for v in c.vars:
+                print '    v',v.name
+        print 'cycle', cycle
+        print 'vars_unfix'
+        for k in vars_unfix:
+            print k.name
         messages =  sur_prop(clauses, t_max, precision)
 
         if messages == 'UN-CONVERGED':
@@ -24,17 +37,21 @@ def sid(clauses, variables, precision, t_max):
         
         else:
             trivial = True
-            
-            for message in messages:
-                if message != 0.:
-                    trivial = False
 
+            # check if messages trivial
+            for message in messages.values():
+                # print 'message', message
+
+                if message > 0:
+                    trivial = False
+                    
+            # for var in variables:
+            #     if var.val == None:
+            #         vars_unfix.add(var)
+            #         print 'unfixed var', var.name, var.val
+            print 'n unfixed vars', len(vars_unfix)
             if trivial == False:
-                vars_unfix = set()
-                
-                for var in variables:
-                    if var.val == None:
-                        vars_unfix.add(var)
+               
                 variance = []
 
                 for i in vars_unfix:
@@ -57,12 +74,6 @@ def sid(clauses, variables, precision, t_max):
                     w_min = pi_min / (pi_plus + pi_min + pi_0)
                     w_0 = 1 - w_plus - w_min
                     variance.append((i, w_plus, w_min))
-                print 'variance'
-
-                for k in variance:
-                    print k[0].name, k[1], k[2], abs(k[1] - k[2])
-
-                print 'gap'
                 variance.sort(key = lambda x: abs(x[1] - x[2]), reverse = True)
 
                 print 'variance sorted'
@@ -72,34 +83,28 @@ def sid(clauses, variables, precision, t_max):
 
                 if variance[0][1] > variance[0][2]:
                     variance[0][0].val = 1
+                    vars_unfix.remove(variance[0][0])
+                    print 'var', variance[0][0].name, 'val', variance[0][0].val
 
                 else:
                     variance[0][0].val = -1
+                    vars_unfix.remove(variance[0][0])
+                    print 'var', variance[0][0].name, 'val', variance[0][0].val
 
-                print 'sat check'
-                
-                for c in clauses:
-                    print 'name: ', c.name
-
-                    if c.checkSAT == 2:
-                        vars_new = set()
-
-                        for v in c.vars:
-                            if v.val == None:
-                                print 'clause: ', c.name, 'variable: ', v.name, v.val,
-                                vars_new.add(v)
-
-                            elif v.val * c.getEdge(v) == 1:
-                                print 'clause: ', clause.name, 'variable: ', var.name, 'UNSAT'
-                                vars_new.add(v)
-
-                            else:
-                                print 'clause: ', c.name, 'variable: ', v.name, 'SAT'
-                                print 'removed var: ', v.name, 'from clause: ', c.name
-                            
+                print '\nsat check'
+              
+                # new_cls = set()
+           
+            else:
+                print 'TRIVIAL'
+                ran_var = random.choice(list(vars_unfix))
+                ran_var.val =  random.randrange(-1, 2, 2)
+                vars_unfix.remove(ran_var)
+                print 'v', ran_var.name, 'val', ran_var.val
+            decimate(clauses) 
+        cycle +=1
+    return vars_unfix
                     
-
-
 def sur_prop(clauses, t_max, precision):
     messages = {}
     oldMessages = {}
@@ -112,10 +117,10 @@ def sur_prop(clauses, t_max, precision):
         for i in a.vars:
             messages[(a, i)] = random.random()
 
-    print '\ninitial u_a - > i: '
-    print 'clause, variable, message value'
-    for message in messages:
-        print "c_"+str(message[0].name), "v_"+str(message[1].name), messages[message]
+    # print '\ninitial u_a - > i: '
+    # print 'clause, variable, message value'
+    # for message in messages:
+    #     print "c_"+str(message[0].name), "v_"+str(message[1].name), messages[message]
 
     edges = messages.keys()
     t += 1
@@ -125,7 +130,7 @@ def sur_prop(clauses, t_max, precision):
     while t < t_max:
       
         random.shuffle(edges)
-        print  '\nt = ', t
+        # print  '\nt = ', t
 
         for edge in edges:
             i = edge[1]
@@ -140,16 +145,16 @@ def sur_prop(clauses, t_max, precision):
 
         # check for convergence
         for message in messages:
-            print 'c', message[0].name, 'v',message[1].name, 'new: ', messages\
-                [message], 'old: ', oldMessages[message], 'diff: ',\
-                abs(messages[message] - oldMessages[message]), 't= ', t
+            # print 'c', message[0].name, 'v',message[1].name, 'new: ', messages\
+            #     [message], 'old: ', oldMessages[message], 'diff: ',\
+            #     abs(messages[message] - oldMessages[message]), 't= ', t
            
             if abs(messages[message] - oldMessages[message]) > precision:
                 convergence = False
        
         # if converged return warnings
         if convergence == True:
-            print '\nconverged in  t = ', t
+            # print '\nconverged in  t = ', t
             
             return messages
 
@@ -159,7 +164,7 @@ def sur_prop(clauses, t_max, precision):
         t += 1       
         
 def sp_update(messages, a, i):
-    print 'a, i', a.name, i.name
+    # print 'a, i', a.name, i.name
     newMessage = 1.0
     cavFields = {}
  
@@ -170,36 +175,39 @@ def sp_update(messages, a, i):
         
         if var != i:
             j = var
+            # print 'a', a.name, 'v', var.name
+           
             edgeVal_a_j = a.getEdge(j)
+            # print 'edgeval a j ', edgeVal_a_j
 
-            print '    a, j', a.name, j.name
+            # print '    a, j', a.name, j.name
 
             for clause in j.clauses:
                 if clause != a:
                     b = clause
                     edgeVal_b_j = j.getEdge(b)
 
-                    print '        b, j', b.name, j.name
+                    # print '        b, j', b.name, j.name
                     prob_0 *= (1. - messages[(b, j)])
 
-                    print '    prob_0', prob_0
+                    # print '    prob_0', prob_0
                     
                     # if b element of V^s_a(j) multiply prob_s by
                     # (1 - message value)
                     if edgeVal_a_j == edgeVal_b_j:
                         prob_u *= (1. - messages[(b, j)])
                         
-                        print '    prob_u', prob_u
+                        # print '    prob_u', prob_u
                      
                     # else if b element of V^u_a(j), multiply prob_u by
                     # (1 - message value)
                     elif edgeVal_a_j == -1. * edgeVal_b_j:
                         prob_s *= (1. - messages[(b, j)])
                         
-                        print '    prob_s', prob_s
+                        # print '    prob_s', prob_s
      
             # store cavity field and update new warning
-            print 'j = ', j.name
+            # print 'j = ', j.name
             pi_u = (1 - prob_s) * prob_u
             pi_s = (1 - prob_u) * prob_s
             pi_0 = prob_0
@@ -210,13 +218,37 @@ def sp_update(messages, a, i):
             else:
                 cavFields[(j,a)] = 0.
                 
-            print 'appending to cavfieldsG in bpUpdate'
+            # print 'appending to cavfieldsG in bpUpdate'
             cavFieldsG[(j,a)] = cavFields[(j,a)]
                 
-            print '    cav', a.name, j.name, cavFields[(j,a)], '\n'
+            # print '    cav', a.name, j.name, cavFields[(j,a)], '\n'
             newMessage *=  cavFields[(j,a)]
    
     return newMessage
+
+def decimate(clauses):
+    for c in clauses.copy():
+        if c.checkSAT() == 2:
+            print '\nc', c.name, 'UNSAT'
+
+            for v in c.vars:
+                if v.val == None:
+                    print 'v', v.name, v.val,
+
+                elif v.val * c.getEdge(v) == 1:
+                    print 'v', v.name, v.val, 'UNSAT'
+
+                else:
+                    c.remVar(v)
+                    print 'removed v', v.name, 'from c', c.name
+                    # new_cls.add(c)
+        else:
+            print '\nc', c.name, 'SAT'
+            print 'removing c', c.name
+            clauses.remove(c)
+            for v in c.vars:
+                print 'removing', c.name, 'from', v.name
+                v.remCls(c)
 
 class Clause:
     def __init__(self, name, vars):
@@ -228,7 +260,9 @@ class Clause:
         # combine variable objects and edges into key-value pairs
     
     def getEdge(self, var):
-        return self.vars[var]
+            return self.vars[var]
+
+           
 
     def addVar(self, var, edge):
         self.vars[var] = edge
@@ -251,11 +285,11 @@ class Clause:
                 empty = False
                 edgeValProducts.add(var.val * self.getEdge(var))
 
-                if var.val * self.getEdge(var) == -1:
-                    print 'variable: ', var.name, 'SAT'
+                # if var.val * self.getEdge(var) == -1:
+                #     print 'variable: ', var.name, 'SAT'
                     
-                else:
-                    print 'variable: ', var.name, 'UNSAT' 
+                # else:
+                #     print 'variable: ', var.name, 'UNSAT' 
 
         # sat = 0 if at least one variable satisfies clause, else sat = 2
         # [mezard K-SAT paper eq. 5]
@@ -289,9 +323,12 @@ class Variable:
     def addClause(self, clause, edge):
         self.clauses[clause] = edge
         self.K += 1
+        
+    def remCls(self, clause):
+        del self.clauses[clause]
+        self.K -= 1
 
 class MyTimer():
- 
     def __init__(self):
         self.start = time.time()
  
@@ -337,13 +374,14 @@ def sat_loader(es):
         vs_out.add(vs[v])
     
     return cs_out, vs_out
-        
 
 if __name__== "__main__":
+   
+     
     t_max = 10000
     precision = 0.001
-    clauses, variables = sat_loader(braun_edgs) 
+    clauses, variables = sat_loader(braun_edgs)
+   
     with MyTimer():
-        sur_prop(clauses, t_max, precision)
         # clauses, variables = sat_loader(braun_edgs) 
-        # sid(clauses, variables, precision, t_max)
+        sid(clauses, variables, precision, t_max)
