@@ -15,22 +15,37 @@ cavFieldsG = {}
 def sid(clauses, variables, precision, t_max):
     cycle = 0
     vars_unfix = set()
+    clauses_unsat = set()
 
     for var in variables:
         if var.val == None:
             vars_unfix.add(var)
-    
-    while len(vars_unfix) > 0:
-      
-        for c in clauses:
-            print 'c', c.name
+            
+    for c in clauses:
+        if c.checkSAT() == 2:
+            clauses_unsat.add(c)
+            
+    while len(clauses_unsat) > 0:
+        
+        print '\ncycle', cycle
+        print '\nclauses'
+        
+        for c in clauses_unsat:
+            print 'c', c.name, c.checkSAT()
+            
             for v in c.vars:
-                print '    v',v.name
-        print 'cycle', cycle
-        print 'vars_unfix'
-        for k in vars_unfix:
-            print k.name
-        messages =  sur_prop(clauses, t_max, precision)
+                print '    v',v.name, v.val
+                
+        print '\nvariables'
+        
+        for v in variables:
+            print 'v', v.name, v.val
+            
+            for c in v.clauses:
+                print '    c', c.name, c.checkSAT()
+                       
+        messages =  sur_prop(clauses_unsat, t_max, precision)
+        plotGraph(clauses, variables, str(cycle), messages) 
 
         if messages == 'UN-CONVERGED':
             return 'UN-CONVERGED'
@@ -50,8 +65,8 @@ def sid(clauses, variables, precision, t_max):
             #         vars_unfix.add(var)
             #         print 'unfixed var', var.name, var.val
             print 'n unfixed vars', len(vars_unfix)
+            
             if trivial == False:
-               
                 variance = []
 
                 for i in vars_unfix:
@@ -83,34 +98,82 @@ def sid(clauses, variables, precision, t_max):
 
                 if variance[0][1] > variance[0][2]:
                     variance[0][0].val = 1
-                    vars_unfix.remove(variance[0][0])
-                    
                     print 'var', variance[0][0].name, 'val', variance[0][0].val
 
                 else:
-                    variance[0][0].val = -1
-                    vars_unfix.remove(variance[0][0])
-                    
+                    variance[0][0].val = -1 
                     print 'var', variance[0][0].name, 'val', variance[0][0].val
-
                 print '\nsat check'
-              
-                # new_cls = set()
-           
+            
             else:
-                print 'TRIVIAL'
-                ran_var = random.choice(list(vars_unfix))
-                ran_var.val =  random.randrange(-1, 2, 2)
-                vars_unfix.remove(ran_var)
-                
-                print 'v', ran_var.name, 'val', ran_var.val
-            plotGraph(clauses, variables, str(cycle), messages)
-            decimate(clauses)
+                walk_sat(clauses, clauses_unsat)
+            decimate(clauses_unsat, vars_unfix)
             
         cycle +=1
+    plotGraph(clauses_unsat, variables, 'fin', messages)
+    print 'SAT'
+    for c in clauses:
+        print 'c', c.name, c.checkSAT()
+            
+        for v in c.vars:
+            print '    v',v.name, v.val
+    return clauses, variables
         
     return vars_unfix
-                    
+def walk_sat(clauses, clauses_unsat):
+    print 'WALKSAT'
+    c = random.choice(list(clauses_unsat))
+    if random.random() < 0.8:
+        unsatisfiers = {}
+        
+        for v in c.vars:
+            v.val *= -1
+            sat_v_cls = [cls for cls in clauses if cls not in clauses_unsat]
+            print 'unsat_v_cls', unsat_v_cls
+            unsat_point = 0
+
+            for v_cls in sat_v_cls:
+                if v_cls.checkSAT() == 2:
+                    unsatisfy +=1
+            unsatisfiers[v] = unsatisfy
+            v.val *= -1
+        print unsatisfiers
+        best = min(unsatisfiers, key = unsatisfiers.get)
+       
+    else:
+        best = random.choice(list(c.vars))
+    best.val *= -1
+
+def decimate(clauses_unsat, vars_unfix):
+    for c in clauses_unsat.copy():
+        if c.checkSAT() == 2:
+            print '\nc', c.name, 'UNSAT'
+
+            for v in c.vars:
+                if v.val == None:
+                    print 'v', v.name, v.val,
+
+                elif v.val * c.getEdge(v) == 1:
+                    print 'v', v.name, v.val, 'UNSAT'
+
+                else:
+                    raise Exception('oh no')
+        # if c sat
+        else:
+            print '\nc', c.name, 'SAT'
+            print 'removing c', c.name
+            clauses_unsat.remove(c)
+            
+            for v in c.vars:
+                print 'removing c', c.name, 'from v', v.name
+                v.remCls(c)
+                
+    # remove assigned vars from vars_unfix
+    for v in vars_unfix.copy():
+        if v.val != None:
+            print 'removing v', v.name, v.val, 'from vars_unfix'
+            vars_unfix.remove(v)
+            
 def sur_prop(clauses, t_max, precision):
     messages = {}
     oldMessages = {}
@@ -232,29 +295,6 @@ def sp_update(messages, a, i):
    
     return newMessage
 
-def decimate(clauses):
-    for c in clauses.copy():
-        if c.checkSAT() == 2:
-            print '\nc', c.name, 'UNSAT'
-
-            for v in c.vars:
-                if v.val == None:
-                    print 'v', v.name, v.val,
-
-                elif v.val * c.getEdge(v) == 1:
-                    print 'v', v.name, v.val, 'UNSAT'
-
-                else:
-                    c.remVar(v)
-                    print 'removed v', v.name, 'from c', c.name
-                    # new_cls.add(c)
-        else:
-            print '\nc', c.name, 'SAT'
-            print 'removing c', c.name
-            clauses.remove(c)
-            for v in c.vars:
-                print 'removing', c.name, 'from', v.name
-                v.remCls(c)
 
 class Clause:
     def __init__(self, name, vars):
@@ -344,7 +384,21 @@ class MyTimer():
         runtime = end - self.start
         msg = 'The function took {time} seconds to complete'
         print(msg.format(time=runtime))
+
+
+def ran_3sat(nc, nv):
+    edgs = {}
+
+    for c in range(nc):
         
+        ran_vars = random.sample(range(nv), 3)
+        
+        for v in ran_vars:
+            edgs[(c, v)] = random.randrange(-1, 2, 2)
+    return edgs
+            
+        
+
 # Braunstein survey propogation paper Fig. 3
 braun_edgs = {(1, 1) : -1,\
                (2, 2) : 1,\
@@ -382,59 +436,59 @@ def sat_loader(es):
 def plotGraph(clauses, variables, imgName, messages):
     print 'plotgraph: printing cavity fields G'
     
-    for i in cavFieldsG:
+    # for i in cavFieldsG:
         
-        print 'cavFieldsG entry: ', i[1].name, i[0].name, cavFieldsG[i]
+        # print 'cavFieldsG entry: ', i[1].name, i[0].name, cavFieldsG[i]
         
    
         
-    print 'plotgraph: messages'
+    # print 'plotgraph: messages'
     
-    for key in messages:
+    # for key in messages:
         
-        print key[0].name, key[1].name, messages[key]
+    #     print key[0].name, key[1].name, messages[key]
 
     g = graphviz.Graph(format='png')
     g.graph_attr.update(ranksep='3')
 
     for v in variables:
         g.node('v '+str(v.name), 'v '+str(v.name)+'\n'+str(v.val),shape= 'circle')
-    print 'plotgraph: cavity fields'
+    # print 'plotgraph: cavity fields'
     for c in clauses:
         g.node('c '+str(c.name), shape= 'square')
         
-        for var in c.vars:
-           
-            if  cavFieldsG.get((var, c)) != None:
-               
-                print 'c',c.name,'v', var.name, cavFieldsG[(var,c)]
+        if c.checkSAT() == 2:
+            for var in c.vars:
+
+                # if  cavFieldsG.get((var, c)) != None:
+
+                    # print 'c',c.name,'v', var.name, cavFieldsG[(var,c)]
 
                 if c.getEdge(var) == -1:
-                    g.edge('c ' + str(c.name), 'v '+str(var.name), color = 'blue', \
-                               label = 'm'+str(messages[(c, var)])[:5]  + '\n' + \
-                                'c'+str(cavFieldsG[(var, c)])[:5])
+                    g.edge('c ' + str(c.name), 'v '+str(var.name), color = 'blue')#  \
+                               # label = 'm'+str(messages[(c, var)])[:5]  + '\n' + \
+                               #  'c'+str(cavFieldsG[(var, c)])[:5])
 
                 else:  
-                    g.edge('c ' + str(c.name), 'v '+str(var.name), color = 'red', \
-                               label = 'm'+str(messages[(c,var)])[:5] + '\n' + \
-                                'c'+str(cavFieldsG[(var, c)])[:5])
-            else:
-                print c.name, var.name, 'does not have a cavity field'
+                    g.edge('c ' + str(c.name), 'v '+str(var.name), color = 'red')
+                               # label = 'm'+str(messages[(c,var)])[:5] + '\n' + \
+                               #  'c'+str(cavFieldsG[(var, c)])[:5])
+                # else:
+                #     # print c.name, var.name, 'does not have a cavity field'
 
-                if c.getEdge(var) == -1:
-                    g.edge('c ' + str(c.name), 'v '+str(var.name), color = 'blue', \
-                               label = str(messages[(c,var)])[:5])
+                #     if c.getEdge(var) == -1:
+                #         g.edge('c ' + str(c.name), 'v '+str(var.name), color = 'blue', \
+                #                    label = str(messages[(c,var)])[:5])
 
-                else:  
-                    g.edge('c ' + str(c.name), 'v '+str(var.name), color = 'red', \
-                               label = str(messages[(c,var)])[:5])              
+                #     else:  
+                #         g.edge('c ' + str(c.name), 'v '+str(var.name), color = 'red', \
+                #                    label = str(messages[(c,var)])[:5])       
+
     g.render('out/'+imgName+'.gv', view=True)  
 if __name__== "__main__":
-   
-     
     t_max = 10000
     precision = 0.001
-    clauses, variables = sat_loader(braun_edgs)
+    clauses, variables = sat_loader(ran_3sat(40,10))
    
     with MyTimer():
         # clauses, variables = sat_loader(braun_edgs) 
