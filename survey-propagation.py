@@ -9,26 +9,24 @@ import math
 import numpy
 import time
 import graphviz
+import copy
 
 cavFieldsG = {}
 
 def sid(clauses, variables, precision, t_max):
     cycle = 0
+
     vars_unfix = set()
     clauses_unsat = set()
+    for v in variables:
+        vars_unfix.add(v)
 
-    for var in variables:
-        if var.val == None:
-            vars_unfix.add(var)
-            
     for c in clauses:
-        if c.checkSAT() == 2:
-            clauses_unsat.add(c)
+        clauses_unsat.add(c)
             
     while len(clauses_unsat) > 0:
-        
         print '\ncycle', cycle
-        print '\nclauses'
+        print '\nunsat clauses'
         
         for c in clauses_unsat:
             print 'c', c.name, c.checkSAT()
@@ -45,7 +43,7 @@ def sid(clauses, variables, precision, t_max):
                 print '    c', c.name, c.checkSAT()
                        
         messages =  sur_prop(clauses_unsat, t_max, precision)
-        plotGraph(clauses, variables, str(cycle), messages) 
+        # plotGraph(clauses, variables, str(cycle), messages) 
 
         if messages == 'UN-CONVERGED':
             return 'UN-CONVERGED'
@@ -54,10 +52,10 @@ def sid(clauses, variables, precision, t_max):
             trivial = True
 
             # check if messages trivial
-            for message in messages.values():
-                # print 'message', message
+            for message in messages:
+                print 'message', message[0].name, message[1].name, messages[message]
 
-                if message > 0:
+                if messages[message]  > 0:
                     trivial = False
                     
             # for var in variables:
@@ -65,8 +63,9 @@ def sid(clauses, variables, precision, t_max):
             #         vars_unfix.add(var)
             #         print 'unfixed var', var.name, var.val
             print 'n unfixed vars', len(vars_unfix)
+            print 'n unsat clauses', len(clauses_unsat)
             
-            if trivial == False:
+            if trivial == False and len(vars_unfix) > 0:
                 variance = []
 
                 for i in vars_unfix:
@@ -85,79 +84,140 @@ def sid(clauses, variables, precision, t_max):
                     pi_plus = (1 - prod_v_plus) * prod_v_min
                     pi_min = (1 - prod_v_min) * prod_v_plus
                     pi_0 = prod_v_0
-                    w_plus = pi_plus / (pi_plus + pi_min + pi_0)
-                    w_min = pi_min / (pi_plus + pi_min + pi_0)
+                    
+                    if pi_plus == 0:
+                        w_plus = 0
+                        
+                    else:
+                        w_plus = pi_plus / (pi_plus + pi_min + pi_0)
+                        
+                    if pi_min == 0:
+                        w_min = 0
+                        
+                    else:
+                        w_min = pi_min / (pi_plus + pi_min + pi_0)
                     w_0 = 1 - w_plus - w_min
                     variance.append((i, w_plus, w_min))
+                max_var = max(variance, key = lambda x : abs(x[1] - x[2]))
                 variance.sort(key = lambda x: abs(x[1] - x[2]), reverse = True)
 
                 print 'variance sorted'
 
                 for k in variance:
-                    print k[0].name, k[1], k[2], abs(k[1] - k[2])
+                    print k[0].name,  abs(k[1] - k[2])
 
-                if variance[0][1] > variance[0][2]:
-                    variance[0][0].val = 1
-                    print 'var', variance[0][0].name, 'val', variance[0][0].val
+                if max_var[1] > max_var[2]:
+                    max_var[0].val = 1
+                    print 'var', max_var[0].name, 'val', max_var[0].val
 
                 else:
-                    variance[0][0].val = -1 
-                    print 'var', variance[0][0].name, 'val', variance[0][0].val
+                    max_var[0].val = -1 
+                    print 'var', max_var[0].name, 'val', max_var[0].val
                 print '\nsat check'
             
             else:
                 walk_sat(clauses, clauses_unsat)
             decimate(clauses_unsat, vars_unfix)
+            for var in variables:
+                if var.val == None:
+                    vars_unfix.add(var)
+            
+            for c in clauses:
+                if c.checkSAT() == 2:
+                    clauses_unsat.add(c)
             
         cycle +=1
-    plotGraph(clauses_unsat, variables, 'fin', messages)
-    print 'SAT'
+    # plotGraph(clauses, variables, 'fin', messages)
+    # print 'SAT'
     for c in clauses:
         print 'c', c.name, c.checkSAT()
             
         for v in c.vars:
             print '    v',v.name, v.val
+    print "SATISFIED"
     return clauses, variables
         
     return vars_unfix
+
 def walk_sat(clauses, clauses_unsat):
     print 'WALKSAT'
     c = random.choice(list(clauses_unsat))
+    print 'random c', c.name
+    unsatisfiers = {}
+    clauses_sat = [cls for cls in clauses if cls not in clauses_unsat]
+    
     if random.random() < 0.8:
-        unsatisfiers = {}
+        print 'least unsat mode'
         
         for v in c.vars:
-            v.val *= -1
-            sat_v_cls = [cls for cls in clauses if cls not in clauses_unsat]
-            print 'unsat_v_cls', unsat_v_cls
-            unsat_point = 0
+            store_unsat(v, unsatisfiers, clauses_sat)
 
-            for v_cls in sat_v_cls:
-                if v_cls.checkSAT() == 2:
-                    unsatisfy +=1
-            unsatisfiers[v] = unsatisfy
-            v.val *= -1
-        print unsatisfiers
-        best = min(unsatisfiers, key = unsatisfiers.get)
-       
+        # find potenial variable flip with least c unsats
+        min_unsatisfied = 100
+        best = []
+        
+        for v in unsatisfiers:
+            print 'v', v.name, 'n pot unsat', [i.name for i in unsatisfiers[v]]
+            
+            if len(unsatisfiers[v]) < min_unsatisfied:
+                min_unsatisfied = len(unsatisfiers[v])
+                best = [v]
+                
+            elif len(unsatisfiers[v]) == min_unsatisfied:
+                best.append(v)
+        print 'best list', [i.name for i in best]
+        best = random.choice(best)
+        
     else:
+        print 'random mode'
         best = random.choice(list(c.vars))
+        store_unsat(best, unsatisfiers, clauses_sat)
     best.val *= -1
+    print 'best var', best.name, 'val', best.val
+
+    # re-add clauses 
+    for c in unsatisfiers[best]:
+        best.addClause(c, c.getEdge(best))
+        print 'added c', c.name, 'to v', best.name
+    
+    
+def store_unsat(v, unsatisfiers, clauses_sat):
+    print 'causes_sat', [i.name for i in clauses_sat]
+    v.val *= -1
+    unsatisfied = []
+
+    for c in clauses_sat:
+
+        if c.checkSAT() == 2:
+            unsatisfied.append(c)
+
+    v.val *= -1
+    print 'unsatisfied'
+
+    for u in unsatisfied:
+        print u.name
+    unsatisfiers[v] = unsatisfied
 
 def decimate(clauses_unsat, vars_unfix):
     for c in clauses_unsat.copy():
         if c.checkSAT() == 2:
             print '\nc', c.name, 'UNSAT'
-
+            output = ''
+            
             for v in c.vars:
+                
                 if v.val == None:
-                    print 'v', v.name, v.val,
+                    output += 'v ' + str(v.name) + ' ' + str(v.val) + '\n'
+                    # print 'v', v.name, v.val,
 
                 elif v.val * c.getEdge(v) == 1:
-                    print 'v', v.name, v.val, 'UNSAT'
-
+                    output += 'v ' + str(v.name) + ' ' + str(v.val) + ' UNSAT\n'
+                    # print 'v', v.name, v.val, 'UNSAT'
+                    
                 else:
                     raise Exception('oh no')
+            print output
+             
         # if c sat
         else:
             print '\nc', c.name, 'SAT'
@@ -165,8 +225,9 @@ def decimate(clauses_unsat, vars_unfix):
             clauses_unsat.remove(c)
             
             for v in c.vars:
-                print 'removing c', c.name, 'from v', v.name
-                v.remCls(c)
+                if c in v.clauses:
+                    print 'removing c', c.name, 'from v', v.name
+                    v.remCls(c)
                 
     # remove assigned vars from vars_unfix
     for v in vars_unfix.copy():
@@ -197,6 +258,7 @@ def sur_prop(clauses, t_max, precision):
     # while t < t_max, iterate over every edge in a random fashion and update
     # warnings sequntially using the sp_update routine
     while t < t_max:
+        print t
       
         random.shuffle(edges)
         # print  '\nt = ', t
@@ -213,17 +275,30 @@ def sur_prop(clauses, t_max, precision):
         convergence = True
 
         # check for convergence
+        hi_diff = 0
+        diff_sum = 0 
+        
         for message in messages:
+            # diff =  abs(messages[message] - oldMessages[message])
+            # diff_sum += diff
+            
+            # if diff > hi_diff:
+            #     hi_diff = diff
+            
             # print 'c', message[0].name, 'v',message[1].name, 'new: ', messages\
             #     [message], 'old: ', oldMessages[message], 'diff: ',\
             #     abs(messages[message] - oldMessages[message]), 't= ', t
+        
            
             if abs(messages[message] - oldMessages[message]) > precision:
                 convergence = False
-       
+        # avg_diff =  diff_sum / len(messages)
+        # print 't', t, 'hi_diff', hi_diff, 'avg_diff', avg_diff
+        # print 't', t
+        
         # if converged return warnings
         if convergence == True:
-            # print '\nconverged in  t = ', t
+            print '\nconverged in  t = ', t
             
             return messages
 
@@ -486,9 +561,11 @@ def plotGraph(clauses, variables, imgName, messages):
 
     g.render('out/'+imgName+'.gv', view=True)  
 if __name__== "__main__":
+    shutil.rmtree('out')
+    os.mkdir('out')
     t_max = 10000
     precision = 0.001
-    clauses, variables = sat_loader(ran_3sat(40,10))
+    clauses, variables = sat_loader(ran_3sat(20,4))
    
     with MyTimer():
         # clauses, variables = sat_loader(braun_edgs) 

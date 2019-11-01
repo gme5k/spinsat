@@ -9,9 +9,12 @@ import math
 import multiprocessing
 import numpy
 import graphviz
+import time
 
 cavFieldsG = {}
 
+
+ 
 class Clause:
 # input:
 #     string                       name
@@ -153,7 +156,7 @@ class Variable:
 
 def sid(clauses, variables, precision):
      
-    messages =  belResults(clauses, variables, 0.0000001, True)
+    messages =  belProp(clauses, 10000, precision, True )
     trivial = True
     
     for message in messages:
@@ -162,6 +165,7 @@ def sid(clauses, variables, precision):
             
     if trivial == False:
         variance = []
+        
         for i in variables:
             prod_v_plus = 1.
             prod_v_min = 1.
@@ -178,7 +182,6 @@ def sid(clauses, variables, precision):
             pi_plus = (1 - prod_v_plus) * prod_v_min
             pi_min = (1 - prod_v_min) * prod_v_plus
             pi_0 = prod_v_0
-
             w_plus = pi_plus / (pi_plus + pi_min + pi_0)
             w_min = pi_min / (pi_plus + pi_min + pi_0)
             w_0 = 1 - w_plus - w_min
@@ -190,6 +193,17 @@ def sid(clauses, variables, precision):
         variance.sort(key = lambda x: abs(x[1] - x[2]), reverse = True)
         for k in variance:
             print k[0].name, k[1], k[2], abs(k[1] - k[2])
+        if variance[0][1] > variance[0][2]:
+            variance[0][0].val = 1
+        else:
+            variance[0][0].val = 0
+        print variance[0][0].val
+
+        for c in clauses:
+            print c.checkSat()
+                
+        
+        
 
             
 def sp_update(edges, messages, a, i):
@@ -399,7 +413,7 @@ def belProp(clauses, tmax, precision, sid):
     for a in clauses:
 
         for i in a.vars:
-            messages[(a, i)] = random.randrange(0,1000001, 1) / 10**6
+            messages[(a, i)] = random.random()
 
     print '\ninitial u_a - > i: '
     print 'clause, variable, message value'
@@ -855,18 +869,13 @@ def wpUpdate(edges, messages, a, i):
     
     return newMessage
 
-
-
 def theta(x):
     if x <= 0:
         return 0
     if x > 0:
         return 1
 
-
-
 def ranGraph(kMin, kMax, cMin, cMax, vMin, vMax):
-    
     clauses = []
     variables = []
   
@@ -1011,6 +1020,10 @@ for var in braunVars:
         if var in clause.vars:
             var.addClause(clause)
 
+
+
+
+
 if __name__== "__main__":
  
     shutil.rmtree('out')
@@ -1020,7 +1033,9 @@ if __name__== "__main__":
     clauses = braunClauses
     variables = braunVars
     # clauses, variables = ranGraph(1, 2, 2, 2, 2, 2)
-    sid(clauses, variables, 0.0000001)
+    with MyTimer():
+        belProp(clauses, 10000, precision, True )
+    # sid(clauses, variables, 0.001)
    
     # print >>f, WID(0, clauses, variables, 100)
     # subprocess.call(["mogrify", "-path", "out/resized", "-resize", "1920x1060", "out/*.png"])
