@@ -11,6 +11,7 @@ import time
 import graphviz
 import copy
 
+
 cavFieldsG = {}
 
 def sid(clauses, variables, precision, t_max):
@@ -402,36 +403,85 @@ def store_unsat(og_clauses, v, unsatisfiers, clauses_sat):
         print u.name
     unsatisfiers[v] = unsatisfied
 
-def sim_an(clauses, variables):
-    # init vals
-    score = 100000
+def sim_an(clauses, variables, t_max, down_hill_acceptance):
+    s_max = float(len(variables) * 2)
     
     for v in variables:
         v.val =  random.randrange(-1, 2, 2)
-        
+    score = float(sum(c.checkSAT() for c in clauses))
+    cur_state = {v : v.val for v in variables}
+    t = 0
+    tx = [0]
+    sx = [score]
     while score > 0:
+        tx.append(t)
+        sx.append(score)
         ran_v = random.choice(list(variables))
         ran_v.val *= -1
-        new_score = sum(c.checkSAT() for c in clauses)
+        new_score = float(sum(c.checkSAT() for c in clauses))
+        a_T = -1
+        b_T = t_max
+        T = lin_eq(t, a_T, b_T)
+        x = new_score - score
+        P = prob(x, t_max, t, T, down_hill_acceptance)
+        ran = random.random()
         
-        print 'score', score
-        print 'new_score', new_score
-            
-        if new_score < score:
+        if ran <= P:
+            print 'x', x, '\nP', P, '\nt', t, '\nT', T, '\nnew_score', new_score
+            # print ran, '<=', P, 't', t, 'new score', new_score, 'T', T
+            # print 'cur_state', sorted([(i.name, cur_state[i])\
+            #                            for i in cur_state], key=lambda x: x[0])
             score = new_score
+            cur_state = {v : v.val for v in variables}
+            # print 'new_state', sorted([(i.name, cur_state[i])\
+            #                            for i in cur_state], key=lambda x: x[0])
             
         else:
-            ran_v.val *= -1
+            revert_state(cur_state, variables)
+        t += 1
         
+        if t == t_max:
+            return tx, sx, score, sorted([(i.name, cur_state[i]) for i in cur_state], key=lambda x: x[0])
+    return tx, sx, sorted([(i.name, cur_state[i]) for i in cur_state], key=lambda x: x[0])
+               
+def revert_state(state, variables):
+    for v in variables:
+        v.val = state[v]
 
+def prob(x,  t_max, t, T, down_hill_acceptance):
+   
+    if x > 0:
+        n = 2 / abs(x)
+        P = (T / (2 * t_max)) * n
+       
+        
+    elif x < 0:
+        n = 2 / abs(x)
+        if down_hill_acceptance == 1:
+            P = 1
+        else:
+            P =  1 - ((T / (2 * t_max)) * n)
+       
+        
+    else:
+        P = .5
+       
+    return P
+    
+def lin_eq(x, a, b):
+    return a * x + b
+
+   
+        
+    
 
      
    
-    for c in clauses:
-        print c.name, c.checkSAT()
+    # for c in clauses:
+    #     print c.name, c.checkSAT()
 
-        for v in c.vars:
-            print '    v', v.name, v.val, v.getEdge(c)
+    #     for v in c.vars:
+    #         print '    v', v.name, v.val, v.getEdge(c)
         
         
         
@@ -639,10 +689,22 @@ if __name__== "__main__":
  
     shutil.rmtree('out')
     os.mkdir('out')
-    t_max = 10000
+    t_max = 3000
     precision = 0.001
-    clauses, variables = sat_loader(ran_3sat(100,25))
-    sim_an(clauses, variables)
+    graph = ran_3sat(1000, 250)
+    clauses, variables = sat_loader(graph)
+    typ_a  =  sim_an(clauses, variables, 100100., 1)
+    typ_b = sim_an(clauses, variables, 10000., 0)
+    x1 = typ_a[0]
+    y1 = typ_a[1]
+    x2 = typ_b[0]
+    y2 = typ_b[1]
+    plt.plot(x1, y1, 'r', label = 'aggresive')
+    plt.plot(x2, y2, 'b', label = 'conservative')
+    plt.legend()
+    plt.show()
+    
+    
     
    
     # with MyTimer():
