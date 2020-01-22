@@ -51,7 +51,7 @@ def sid(clauses, variables, precision, t_max):
     for c in clauses:
         clauses_unsat.add(c)
         
-    plotGraph(og_clauses, variables,  str(cycle), {})
+    plotGraph(og_clauses, variables,  'start', {})
 
     # finished if all clauses are satisfied
     while len(clauses_unsat) > 0:
@@ -99,7 +99,10 @@ def sid(clauses, variables, precision, t_max):
 
             # check if messages trivial
             print 'messages'
-            print sorted( [(i[0].name, i[1].name, messages[i]) for i in messages], key=lambda x:x[1])
+            try:
+                print sorted( [(i[0].name, i[1].name, messages[i]) for i in messages], key=lambda x:x[1])
+            except:
+                pass
             for message in messages:
             #     print 'message', message[0].name, message[1].name, message[1].getEdge(message[0]), messages[message]
 
@@ -167,7 +170,9 @@ def sid(clauses, variables, precision, t_max):
             decimate(clauses_unsat, vars_unfix)
 
             # for c in clauses
-            
+            for v in vars_unfix:
+                check_contra(v, messages)
+                
             for var in variables:
                 if var.val == None:
                     vars_unfix.add(var)
@@ -178,6 +183,7 @@ def sid(clauses, variables, precision, t_max):
             plotGraph(og_clauses,  variables, str(cycle), {})
             print 'n unfixed vars', len(vars_unfix)
             print 'n unsat clauses', len(clauses_unsat)
+           
         cycle +=1
     # plotGraph(clauses, variables, 'fin', messages)
     # print 'SAT'
@@ -195,17 +201,17 @@ def sid(clauses, variables, precision, t_max):
     return clauses, variables
 
                               
-# def check_contra(var , messages, vars_unfix):
-#     print 'v', var.name
-#     for c in var.clauses:
-#         try:
-#             print messages[(c, var)]
-#         except:
-#             print 'EXCEPTO'
-#             print var in variables
-#             print var in vars_unfix
-        
-        
+def check_contra(var , messages):
+    print 'v', var.name
+    indexable = list(var.clauses)
+    
+    for c in indexable:
+        for c2 in [c2 for c2 in indexable if indexable.index(c2) > indexable.index(c)]
+            print c.name, c2.name
+            if messages[(c, var)] * messages[(c2, var)] >= 1. - precision ** 2 and var.getEdge(c) != var.getEdge(c2):
+                return 'CONTRADICTION', 'var', var.name, 'c1', c.name, 'e1', var.getEdge(c), 'm1', messages[(c, var)], 'c2', c2.name, 'e2', var.getEdge(c2), 'm2', messages[(c2, var)]
+                
+           
 def sur_prop(clauses, t_max, precision):
     # clauses = clauses_unsat
     messages = {}
@@ -744,21 +750,23 @@ def plotGraph(clauses, variables, imgName, messages):
 
             if var.val == None or c.getEdge(var) * var.val != -1:
                 if c.getEdge(var) == -1:
-                    print 'c', c.name, 'v', var.name, 'e', c.getEdge(var), 'val', var.val, 'blue'
+                    # print 'c', c.name, 'v', var.name, 'e', c.getEdge(var), 'val', var.val, 'blue' # 
                     g.edge('c ' + str(c.name), 'v '+str(var.name), color = 'blue')
 
 
                 elif c.getEdge(var) == 1:
-                    print 'c', c.name, 'v', var.name, 'e', c.getEdge(var),'val', var.val, 'red'
+                    # print 'c', c.name, 'v', var.name, 'e', c.getEdge(var),'val', var.val, 'red'
                     g.edge('c ' + str(c.name), 'v '+str(var.name), color = 'red')
                     
             else:
                 if c.getEdge(var) == -1:
-                    print 'c', c.name, 'v', var.name, 'e', c.getEdge(var),'val', var.val, 'purple'
+                    # print 'c', c.name, 'v', var.name, 'e', c.getEdge(var),'val', var.val, 'purple
+                    
                     g.edge('c ' + str(c.name), 'v '+str(var.name), color = 'green')
                    
                 elif c.getEdge(var) == 1:
-                      print 'c', c.name, 'v', var.name, 'e', c.getEdge(var),'val', var.val, 'orange'
+                      # print 'c', c.name, 'v', var.name, 'e', c.getEdge(var),'val', var.val, 'orange'
+                  
                       g.edge('c ' + str(c.name), 'v '+str(var.name), color = 'green')
 
                         
@@ -789,14 +797,14 @@ def plotGraph(clauses, variables, imgName, messages):
             # elif c.getEdge(var)  == 1 and var.val == -1:
               
                     
-    g.render('out/'+imgName+'.gv', view=True)  
+    g.render('out/'+imgName, view=False)  
 if __name__== "__main__":
  
     shutil.rmtree('out')
     os.mkdir('out')
     t_max = 10000.
     precision = 0.001
-    graph = ran_3sat(10, 3)
+    graph = ran_3sat(40, 10)
     clauses, variables = sat_loader(graph)
     sid(clauses, variables, precision, t_max)
     
