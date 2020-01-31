@@ -89,7 +89,7 @@ def sid(clauses, variables, precision, t_max):
         #         print '    c', c.name, c.checkSAT()
                        
         messages =  sur_prop(clauses_unsat, t_max, precision)
-        # plotGraph(og_clauses, variables, str(cycle), messages) 
+        plotGraph(og_clauses, variables, str(cycle), messages) 
         if messages == 'UN-CONVERGED':
             return 'UN-CONVERGED'
 
@@ -171,7 +171,8 @@ def sid(clauses, variables, precision, t_max):
 
             # for c in clauses
             for v in vars_unfix:
-                check_contra(v, messages)
+                if check_contra(v, messages):
+                    return 'UNSAT'
                 
             for var in variables:
                 if var.val == None:
@@ -203,13 +204,17 @@ def sid(clauses, variables, precision, t_max):
                               
 def check_contra(var , messages):
     print 'v', var.name
-    indexable = list(var.clauses)
+    clause_list = list(var.clauses)
     
-    for c in indexable:
-        for c2 in [c2 for c2 in indexable if indexable.index(c2) > indexable.index(c)]
-            print c.name, c2.name
-            if messages[(c, var)] * messages[(c2, var)] >= 1. - precision ** 2 and var.getEdge(c) != var.getEdge(c2):
-                return 'CONTRADICTION', 'var', var.name, 'c1', c.name, 'e1', var.getEdge(c), 'm1', messages[(c, var)], 'c2', c2.name, 'e2', var.getEdge(c2), 'm2', messages[(c2, var)]
+    for c in clause_list:
+        for c2 in [c2 for c2 in clause_list if clause_list.index(c2) > clause_list.index(c)]:
+            print clause_list.index(c2), clause_list.index(c),  messages[(c, var)], messages[(c2, var)], messages[(c, var)] * messages[(c2, var)] + precision
+            if messages[(c, var)] * messages[(c2, var)] + precision >= 1. and var.getEdge(c) != var.getEdge(c2):
+                print 'Contradiction', 'var', var.name, 'c1', c.name, 'e1', var.getEdge(c), 'm1', messages[(c, var)], 'c2', c2.name, 'e2', var.getEdge(c2), 'm2', messages[(c2, var)]
+                return True
+    else:
+        return False
+   
                 
            
 def sur_prop(clauses, t_max, precision):
@@ -804,7 +809,7 @@ if __name__== "__main__":
     os.mkdir('out')
     t_max = 10000.
     precision = 0.001
-    graph = ran_3sat(40, 10)
+    graph = ran_3sat(150, 30)
     clauses, variables = sat_loader(graph)
     sid(clauses, variables, precision, t_max)
     
