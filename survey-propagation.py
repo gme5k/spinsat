@@ -1,4 +1,4 @@
-
+import sys
 import os
 import itertools
 import random
@@ -11,23 +11,25 @@ import numpy
 import time
 import graphviz
 import copy
+sys.setrecursionlimit(100000)
 
-cavFieldsG = {}
+# cavFieldsG = {}
 
 def sid(clauses, variables, precision, t_max):
     cycle = 0
-    og_clauses = copy.deepcopy(clauses)
+    print 'cycle', cycle
+    # og_clauses = copy.deepcopy(clauses)
 
     # connect og_clauses with variables
-    for ogc in og_clauses:
-        for v in ogc.vars.copy():
-            ogc.remVar(v)
+    # for ogc in og_clauses:
+    #     for v in ogc.vars.copy():
+    #         ogc.remVar(v)
       
-    for v in variables:
-        for c in v.clauses:    
-            for ogc in og_clauses:
-                if c.name == ogc.name:
-                    ogc.addVar(v, v.clauses[c])
+    # for v in variables:
+    #     for c in v.clauses:    
+    #         for ogc in og_clauses:
+    #             if c.name == ogc.name:
+    #                 ogc.addVar(v, v.clauses[c])
                    
         
         # for ogc in og_clauses:
@@ -44,14 +46,14 @@ def sid(clauses, variables, precision, t_max):
     # keep track of unfixed vars and unsat clauses
     vars_unfix = set()
     clauses_unsat = set()
-    
+    print 'copy done'
     for v in variables:
         vars_unfix.add(v)
 
     for c in clauses:
         clauses_unsat.add(c)
         
-    plotGraph(og_clauses, variables,  'start', {})
+    # plotGraph(og_clauses, variables,  'start', {})
 
     # finished if all clauses are satisfied
     while len(clauses_unsat) > 0:
@@ -64,14 +66,14 @@ def sid(clauses, variables, precision, t_max):
         #     for v in ogc.vars:
         #         print '    v', v.name, v.val
         print '\ncycle', cycle
-        print '\nog_clauses'
-        print sorted([(c.name, sorted([(v.name, c.getEdge(v)) for v in c.vars])) for c in og_clauses])
-        print '\nunsat clauses'
-        print sorted([(c.name, sorted([(v.name, c.getEdge(v)) for v in c.vars])) for c in clauses_unsat])
-        print 'unfixed variables'
-        print sorted([(v.name, sorted([(c.name, v.getEdge(c)) for c in v.clauses])) for v in vars_unfix])
-        print 'variables'
-        print sorted([(v.name, sorted([(c.name, v.getEdge(c)) for c in v.clauses])) for v in variables])
+        # print '\nog_clauses'
+        # print sorted([(c.name, sorted([(v.name, c.getEdge(v)) for v in c.vars])) for c in og_clauses])
+        # print '\nunsat clauses'
+        # print sorted([(c.name, sorted([(v.name, c.getEdge(v)) for v in c.vars])) for c in clauses_unsat])
+        # print 'unfixed variables'
+        # print sorted([(v.name, sorted([(c.name, v.getEdge(c)) for c in v.clauses])) for v in vars_unfix])
+        # print 'variables'
+        # print sorted([(v.name, sorted([(c.name, v.getEdge(c)) for c in v.clauses])) for v in variables])
         # print unsat clauses sub vars
         # for c in clauses_unsat:
         #     print 'c', c.name, c.checkSAT()
@@ -89,20 +91,26 @@ def sid(clauses, variables, precision, t_max):
         #         print '    c', c.name, c.checkSAT()
                        
         messages =  sur_prop(clauses_unsat, t_max, precision)
-        plotGraph(og_clauses, variables, str(cycle), messages) 
-        if messages == 'UN-CONVERGED':
-            return 'UN-CONVERGED'
-
+        # plotGraph(og_clauses, variables, str(cycle), messages) 
+        if messages == 'UNCONVERGED':
+            print 'UNCONVERGED'
+            c_sat = 0
+            for c in clauses:
+                if c.checkSAT() == 0:
+                    c_sat +=1
+            return c_sat
         
+
         else:
             trivial = True
 
             # check if messages trivial
-            print 'messages'
-            try:
-                print sorted( [(i[0].name, i[1].name, messages[i]) for i in messages], key=lambda x:x[1])
-            except:
-                pass
+            # print 'messages'
+            
+            # try:
+            #     print sorted( [(i[0].name, i[1].name, messages[i]) for i in messages], key=lambda x:x[1])
+            # except:
+            #     pass
             for message in messages:
             #     print 'message', message[0].name, message[1].name, message[1].getEdge(message[0]), messages[message]
 
@@ -149,24 +157,27 @@ def sid(clauses, variables, precision, t_max):
                         w_min = pi_min / (pi_plus + pi_min + pi_0)
                     w_0 = 1 - w_plus - w_min
                     variance.append((i, w_plus, w_min))
-                max_var = max(variance, key = lambda x : abs(x[1] - x[2]))
+                # max_var = max(variance, key = lambda x : abs(x[1] - x[2]))
                 variance.sort(key = lambda x: abs(x[1] - x[2]), reverse = True)
+                n_fix = ceildiv(len(vars_unfix) , 10)
+                for max_var in variance[:n_fix]:
                 # print 'variance sorted'
                               
                 # for k in variance:
                     # print k[0].name,  abs(k[1] - k[2])
 
-                if max_var[1] > max_var[2]:
-                    max_var[0].val = 1
-                    # print 'var', max_var[0].name, 'val', max_var[0].val
+                    if max_var[1] > max_var[2]:
+                        max_var[0].val = 1
+                        # print 'var', max_var[0].name, 'val', max_var[0].val
 
-                else:
-                    max_var[0].val = -1 
-                    # print 'var', max_var[0].name, 'val', max_var[0].val
-                # print '\nsat check'
+                    else:
+                        max_var[0].val = -1 
+                        # print 'var', max_var[0].name, 'val', max_var[0].val
+                    # print '\nsat check'
             
             else:
-                walk_sat(og_clauses, clauses, clauses_unsat, variables, vars_unfix)
+                print 'should walk_sat'
+                # walk_sat(og_clauses, clauses, clauses_unsat, variables, vars_unfix)
             decimate(clauses_unsat, vars_unfix)
 
             # for c in clauses
@@ -181,7 +192,7 @@ def sid(clauses, variables, precision, t_max):
             for c in clauses:
                 if c.checkSAT() == 2:
                     clauses_unsat.add(c)
-            plotGraph(og_clauses,  variables, str(cycle), {})
+            # plotGraph(og_clauses,  variables, str(cycle), {})
             print 'n unfixed vars', len(vars_unfix)
             print 'n unsat clauses', len(clauses_unsat)
            
@@ -199,16 +210,21 @@ def sid(clauses, variables, precision, t_max):
     #     for c in v.clauses:
     #         print '    c', c.name, c.checkSAT(), c.getEdge(v)
     print "SATISFIED"
-    return clauses, variables
+    c_sat = 0
+    for c in clauses:
+        if c.checkSAT() == 0:
+            c_sat +=1
+    return c_sat
 
                               
 def check_contra(var , messages):
-    print 'v', var.name
+    # print 'check_contra'
+    # print 'v', var.name
     clause_list = list(var.clauses)
     
     for c in clause_list:
         for c2 in [c2 for c2 in clause_list if clause_list.index(c2) > clause_list.index(c)]:
-            print clause_list.index(c2), clause_list.index(c),  messages[(c, var)], messages[(c2, var)], messages[(c, var)] * messages[(c2, var)] + precision
+            # print clause_list.index(c2), clause_list.index(c),  messages[(c, var)], messages[(c2, var)], messages[(c, var)] * messages[(c2, var)] + precision
             if messages[(c, var)] * messages[(c2, var)] + precision >= 1. and var.getEdge(c) != var.getEdge(c2):
                 print 'Contradiction', 'var', var.name, 'c1', c.name, 'e1', var.getEdge(c), 'm1', messages[(c, var)], 'c2', c2.name, 'e2', var.getEdge(c2), 'm2', messages[(c2, var)]
                 return True
@@ -218,6 +234,7 @@ def check_contra(var , messages):
                 
            
 def sur_prop(clauses, t_max, precision):
+
     # clauses = clauses_unsat
     messages = {}
     oldMessages = {}
@@ -234,15 +251,16 @@ def sur_prop(clauses, t_max, precision):
     #     print "c_"+str(message[0].name), "v_"+str(message[1].name), messages[message]
 
     edges = messages.keys()
+    print 'len(edges)', len(edges)
     t += 1
     
     # while t < t_max, iterate over every edge in a random fashion and update
     # warnings sequntially using the sp_update routine
+    
     while t < t_max:
-        # print t
         random.shuffle(edges)
-        # print  '\nt = ', t
-
+        print  '\nt = ', t
+        
         for edge in edges:
             i = edge[1]
             a = edge[0]
@@ -251,7 +269,7 @@ def sur_prop(clauses, t_max, precision):
             oldMessages[(a,i)] = messages[(a,i)]
             
             # update messages with sp_update
-            messages[(a,i)] = sp_update(messages, a, i)   
+            messages[(a,i)] = sp_update(messages, a, i)
         convergence = True
 
         # # check for convergence
@@ -282,7 +300,7 @@ def sur_prop(clauses, t_max, precision):
             return messages
 
         # if not, and time is up, return uncovnerged
-        elif t == t_max:
+        elif t == t_max - 1:
             return 'UNCONVERGED'
         t += 1       
         
@@ -342,7 +360,7 @@ def sp_update(messages, a, i):
                 cavFields[(j,a)] = 0.
                 
             # print 'appending to cavfieldsG in bpUpdate'
-            cavFieldsG[(j,a)] = cavFields[(j,a)]
+            # cavFieldsG[(j,a)] = cavFields[(j,a)]
                 
             # print '    cav', a.name, j.name, cavFields[(j,a)], '\n'
             newMessage *=  cavFields[(j,a)]
@@ -497,9 +515,11 @@ def sim_an(clauses, variables, t_max):
         t += 1
         
         if t == t_max:
-            return tx, sx, score, sorted([(i.name, cur_state[i]) for i in cur_state], key=lambda x: x[0])
-    return tx, sx, sorted([(i.name, cur_state[i]) for i in cur_state], key=lambda x: x[0])
-               
+            return s_max - score
+            # return tx, sx, score, sorted([(i.name, cur_state[i]) for i in cur_state], key=lambda x: x[0])
+    # return tx, sx, sorted([(i.name, cur_state[i]) for i in cur_state], key=lambda x: x[0])
+
+    return s_max - score
 def revert_state(state, variables):
     for v in variables:
         v.val = state[v]
@@ -524,7 +544,8 @@ def lin_eq(x, a, b):
 
    
         
-    
+def ceildiv(a, b):
+    return -(-a / b)
 
      
    
@@ -804,14 +825,16 @@ def plotGraph(clauses, variables, imgName, messages):
                     
     g.render('out/'+imgName, view=False)  
 if __name__== "__main__":
- 
+    problems  = [sat_loader(ran_3sat(400, 100)), sat_loader(ran_3sat(400, 100)), sat_loader(ran_3sat(400, 100)), sat_loader(ran_3sat(400, 100))]
     shutil.rmtree('out')
     os.mkdir('out')
-    t_max = 10000.
+    t_max = 1000.
     precision = 0.001
-    graph = ran_3sat(150, 30)
-    clauses, variables = sat_loader(graph)
-    sid(clauses, variables, precision, t_max)
+
+    results = []
+    for p in problems:
+        results.append(sim_an(p[0], p[1], t_max))
+    print results         
     
     # graph = ran_3sat(9455, 2500)
     # clauses_b, variables_b = sat_loader(graph)
