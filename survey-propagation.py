@@ -11,16 +11,18 @@ import numpy
 import time
 import graphviz
 import copy
+import time
 sys.setrecursionlimit(100000)
 
 # cavFieldsG = {}
 
 def sid(clauses, variables, precision, t_max):
+    start = time.clock()
     cycle = 0
     print 'cycle', cycle
     # og_clauses = copy.deepcopy(clauses)
 
-    # connect og_clauses with variables
+    # # connect og_clauses with variables
     # for ogc in og_clauses:
     #     for v in ogc.vars.copy():
     #         ogc.remVar(v)
@@ -32,14 +34,15 @@ def sid(clauses, variables, precision, t_max):
     #                 ogc.addVar(v, v.clauses[c])
                    
         
-        # for ogc in og_clauses:
-        #     print 'ogc', ogc.name
-        #     for item in v.clauses:
-        #         if c.name == ogc.name:
-        #             print c.name, ogc.name
-                    # ogc.addVar(v, v.get_edge_from_name(c.name))
-            # if ogc.name[c for c in og_clauses if c.name in [item.name for item in v.clauses]]:
-            # print ogc.name
+    #     for ogc in og_clauses:
+    #         # print 'ogc', ogc.name
+    #         for item in v.clauses:
+    #             if c.name == ogc.name:
+    #                 # print c.name, ogc.name
+    #                 ogc.addVar(v, v.get_edge_from_name(c.name))
+    #         # if ogc.name in [c for c in og_clauses if c.name in [item.name for item in v.clauses]]:
+
+              #   print ogc.name
             # print 'ogc add var'
        
 
@@ -53,7 +56,7 @@ def sid(clauses, variables, precision, t_max):
     for c in clauses:
         clauses_unsat.add(c)
         
-    # plotGraph(og_clauses, variables,  'start', {})
+    # plotGraph(og_clauses, variables,  '-', {})
 
     # finished if all clauses are satisfied
     while len(clauses_unsat) > 0:
@@ -98,7 +101,8 @@ def sid(clauses, variables, precision, t_max):
             for c in clauses:
                 if c.checkSAT() == 0:
                     c_sat +=1
-            return c_sat
+            end = time.clock()
+            return c_sat, end - start
         
 
         else:
@@ -159,7 +163,7 @@ def sid(clauses, variables, precision, t_max):
                     variance.append((i, w_plus, w_min))
                 # max_var = max(variance, key = lambda x : abs(x[1] - x[2]))
                 variance.sort(key = lambda x: abs(x[1] - x[2]), reverse = True)
-                n_fix = ceildiv(len(vars_unfix) , 10)
+                n_fix = ceildiv(len(vars_unfix) , 20)
                 for max_var in variance[:n_fix]:
                 # print 'variance sorted'
                               
@@ -183,7 +187,14 @@ def sid(clauses, variables, precision, t_max):
             # for c in clauses
             for v in vars_unfix:
                 if check_contra(v, messages):
-                    return 'UNSAT'
+                    c_sat = 0
+                    
+                    for c in clauses:
+                        
+                        if c.checkSAT() == 0:
+                            c_sat +=1
+                    end = time.clock()
+                    return  c_sat, end - start
                 
             for var in variables:
                 if var.val == None:
@@ -214,7 +225,8 @@ def sid(clauses, variables, precision, t_max):
     for c in clauses:
         if c.checkSAT() == 0:
             c_sat +=1
-    return c_sat
+    end = time.clock()
+    return c_sat, end - start
 
                               
 def check_contra(var , messages):
@@ -477,19 +489,24 @@ def store_unsat(og_clauses, v, unsatisfiers, clauses_sat):
     unsatisfiers[v] = unsatisfied
     
 def sim_an(clauses, variables, t_max):
-    s_max = float(len(variables))
+   
+    start = time.clock()
+    print 'start', start
+    t = start
+    s_max = float(len(clauses))
+    start_score = s_max - float(sum(c.checkSAT() for c in clauses)) / 2
+    print 's_max', s_max
     
     for v in variables:
         v.val =  random.randrange(-1, 2, 2)
     score = float(sum(c.checkSAT() for c in clauses)) / 2
     cur_state = {v : v.val for v in variables}
-    t = 0
-    tx = [0]
-    sx = [score]
-    
+    # tx = [0]
+    # sx = [score]
+   
     while score > 0:
-        tx.append(t)
-        sx.append(score)
+        # tx.append(t)
+        # sx.append(score)
         ran_v = random.choice(list(variables))
         ran_v.val *= -1
         new_score = float(sum(c.checkSAT() for c in clauses)) / 2
@@ -500,9 +517,10 @@ def sim_an(clauses, variables, t_max):
         P = prob(x, t_max, t, T)
         ran = random.random()
         
-        if ran <= P:
-            print 'x', x, '\nP', P, '\nt', t, '\nT', T, '\nnew_score', new_score
-            # print ran, '<=', P, 't', t, 'new score', new_score, 'T', T
+        if  ran <=P:
+            # if x > 0:
+                # print 'P', P
+                # print ran, '<=', P, 't', t, 'new score', new_score, 'T', T 
             # print 'cur_state', sorted([(i.name, cur_state[i])\
             #                            for i in cur_state], key=lambda x: x[0])
             score = new_score
@@ -512,14 +530,15 @@ def sim_an(clauses, variables, t_max):
             
         else:
             revert_state(cur_state, variables)
-        t += 1
-        
-        if t == t_max:
-            return s_max - score
+        t = time.clock()
+        # print 't', t - start, 'tmax', t_max
+        if t - start > t_max:
+            end = time.clock()
+            return s_max - score, end - start, start_score
             # return tx, sx, score, sorted([(i.name, cur_state[i]) for i in cur_state], key=lambda x: x[0])
     # return tx, sx, sorted([(i.name, cur_state[i]) for i in cur_state], key=lambda x: x[0])
-
-    return s_max - score
+    end = time.clock()
+    return s_max - score, end-start, start_score
 def revert_state(state, variables):
     for v in variables:
         v.val = state[v]
@@ -529,6 +548,8 @@ def prob(x,  t_max, t, T):
     if x > 0:
         n = 2 / abs(x)
         P = (T / (2 * t_max)) * n
+        if x == 1:
+            print P
        
         
     elif x < 0:
@@ -825,16 +846,24 @@ def plotGraph(clauses, variables, imgName, messages):
                     
     g.render('out/'+imgName, view=False)  
 if __name__== "__main__":
-    problems  = [sat_loader(ran_3sat(400, 100)), sat_loader(ran_3sat(400, 100)), sat_loader(ran_3sat(400, 100)), sat_loader(ran_3sat(400, 100))]
+    p  = sat_loader(ran_3sat(400,100))
+    p_copy = copy.deepcopy(p)
+    
     shutil.rmtree('out')
     os.mkdir('out')
     t_max = 1000.
     precision = 0.001
 
     results = []
-    for p in problems:
-        results.append(sim_an(p[0], p[1], t_max))
-    print results         
+    
+        
+    # result = sid(p[0], p[1],precision, t_max)
+    t_sim = 12.
+    simres = sim_an(p_copy[0], p_copy[1], t_sim)
+    results.append(', simres:'+str(simres))
+        
+    print results   
+    
     
     # graph = ran_3sat(9455, 2500)
     # clauses_b, variables_b = sat_loader(graph)
