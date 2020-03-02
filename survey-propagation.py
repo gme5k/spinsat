@@ -1,3 +1,5 @@
+import json
+import ast
 import sys
 import os
 import itertools
@@ -7,7 +9,7 @@ import matplotlib.pyplot as plt
 import subprocess
 import shutil
 import math
-import numpy
+import numpy as np
 import time
 import graphviz
 import copy
@@ -844,25 +846,44 @@ def plotGraph(clauses, variables, imgName, messages):
             # elif c.getEdge(var)  == 1 and var.val == -1:
               
                     
-    g.render('out/'+imgName, view=False)  
+    g.render('out/'+imgName, view=False)
+def a_seq(base, lo, up, step):
+    # up = up + (up - lo) / step
+    # step -=1
+    return np.arange(base * lo, base * up, base * (up - lo) / step)
 if __name__== "__main__":
-    p  = sat_loader(ran_3sat(400,100))
-    p_copy = copy.deepcopy(p)
-    
-    shutil.rmtree('out')
-    os.mkdir('out')
-    t_max = 1000.
-    precision = 0.001
+    seq =  a_seq(125, 3.4, 4.6, 50)
+    for n in seq:
+        for c in range(50):
+            with open("problems/125_"+str(int(n))+"_"+str(c)+".json", "w") as f:
+                print list(seq).index(n), c
+                p = ran_3sat(int(n), 125)
+                # print sorted(p.keys(), key = lambda x : x[1])
+                p = {str(k): v for k, v in p.iteritems()}
+                json.dump(p, f)
 
-    results = []
+    # with open("problems/problems.json", "r") as f:
+    #     q = json.load(f)
+    #     converted={ast.literal_eval(k): v for k, v in q.iteritems()} 
+    #     print '\n',sorted(converted.keys(), key = lambda x : x[1])
+
+    
+    # p_copy = copy.deepcopy(p)
+    
+    # shutil.rmtree('out')
+    # os.mkdir('out')
+    # t_max = 1000.
+    # precision = 0.001
+
+    # results = []
     
         
-    # result = sid(p[0], p[1],precision, t_max)
-    t_sim = 12.
-    simres = sim_an(p_copy[0], p_copy[1], t_sim)
-    results.append(', simres:'+str(simres))
+    # # result = sid(p[0], p[1],precision, t_max)
+    # t_sim = 12.
+    # simres = sim_an(p_copy[0], p_copy[1], t_sim)
+    # results.append(', simres:'+str(simres))
         
-    print results   
+    # print results   
     
     
     # graph = ran_3sat(9455, 2500)
