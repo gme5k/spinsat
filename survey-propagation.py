@@ -850,23 +850,88 @@ def plotGraph(clauses, variables, imgName, messages):
 def a_seq(base, lo, up, step):
     return np.arange(base * lo, base * up, base * (up - lo) / step)
 
-if __name__== "__main__":
-    for n in [125, 250, 500, 1000]:
-        seq =  a_seq(n, 3.4, 4.6, 50)
+
+
+
+def experiment(n, start, end):
+    todo = []
+    a_range =  np.arange(3.400, 4.624, 0.024)
+    
+    selection = {"{:.3f}".format(i) for i in a_range[start:end]}
+    print 'selection', selection
+    
+    path = "./problems/"
+    c = 0
+    for i in os.listdir("./problems/"):
         
-        for c in seq:
+        if i[:4] == n and i[10:15] in selection:
+            todo.append(i)
+    todo.sort()
+    for j in todo:
+        print j
+
+      
+            # if i in selection:
+            #     print 'in'
+            # else:
+            #     print 'out'
+            # if str(i)[10:15] in selection:
+            #     print i
+  
             
-            for r in range(50):
+
+    
+    
+    # with open("problems/problems.json", "r") as f:
+    #     q = json.load(f)
+    #     converted={ast.literal_eval(k): v for k, v in q.iteritems()} 
+    #     print '\n',sorted(converted.keys(), key = lambda x : x[1])
+
+    
+    # p_copy = copy.deepcopy(p)
+    
+    # shutil.rmtree('out')
+    # os.mkdir('out')
+    # t_max = 1000.
+    # precision = 0.001
+
+    # results = []
+    
         
-                print "problems/"+ str(n).zfill(4)+"_"+"{:.3f}".format(c / n)+"_"+str(int(c)).zfill(2)+"_"+str(r).zfill(2)+".json",
-                print "{:.2f}"."{:.2f}".
+    # # result = sid(p[0], p[1],precision, t_max)
+    # t_sim = 12.
+    # simres = sim_an(p_copy[0], p_copy[1], t_sim)
+    # results.append(', simres:'+str(simres))
+        
+    # print results   
+
+
+
+if __name__== "__main__":
+    print experiment('0125', 0,4)
+
+    
+
+    
+    
+# def problem_generator():
+    
+#     for n in [125, 250, 500, 1000]:
+#         seq =  a_seq(n, 3.4, 4.6, 50)
+        
+#         for c in seq:
+            
+#             for r in range(50):
+        
+#                 print "problems/"+ str(n).zfill(4)+"_"+"{:.3f}".format(c / n)+"_"+str(int(c)).zfill(2)+"_"+str(r).zfill(2)+".json",
+#                 print "{:.2f}"."{:.2f}".
                 
-                with open("problems/"+ str(n).zfill(4)+"_"+"{:.3f}".format(c / n)+"_"+str(int(c)).zfill(2)+"_"+str(r).zfill(2)+".json", "w") as f:
-                    print n,  c, list(seq).index(c,) r
-                    p = ran_3sat(c, n)
-                    # print sorted(p.keys(), key = lambda x : x[1])
-                    p = {str(k): v for k, v in p.iteritems()}
-                    json.dump(p, f)
+#                 with open("problems/"+ str(n).zfill(4)+"_"+"{:.3f}".format(c / n)+"_"+str(int(c)).zfill(2)+"_"+str(r).zfill(2)+".json", "w") as f:
+#                     print n,  c, list(seq).index(c,) r
+#                     p = ran_3sat(c, n)
+#                     # print sorted(p.keys(), key = lambda x : x[1])
+#                     p = {str(k): v for k, v in p.iteritems()}
+#                     json.dump(p, f)
 
     # with open("problems/problems.json", "r") as f:
     #     q = json.load(f)
