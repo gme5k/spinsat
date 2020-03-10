@@ -848,19 +848,25 @@ def plotGraph(clauses, variables, imgName, messages):
                     
     g.render('out/'+imgName, view=False)
 def a_seq(base, lo, up, step):
-    # up = up + (up - lo) / step
-    # step -=1
     return np.arange(base * lo, base * up, base * (up - lo) / step)
+
 if __name__== "__main__":
-    seq =  a_seq(125, 3.4, 4.6, 50)
-    for n in seq:
-        for c in range(50):
-            with open("problems/125_"+str(int(n))+"_"+str(c)+".json", "w") as f:
-                print list(seq).index(n), c
-                p = ran_3sat(int(n), 125)
-                # print sorted(p.keys(), key = lambda x : x[1])
-                p = {str(k): v for k, v in p.iteritems()}
-                json.dump(p, f)
+    for n in [125, 250, 500, 1000]:
+        seq =  a_seq(n, 3.4, 4.6, 50)
+        
+        for c in seq:
+            
+            for r in range(50):
+        
+                print "problems/"+ str(n).zfill(4)+"_"+"{:.3f}".format(c / n)+"_"+str(int(c)).zfill(2)+"_"+str(r).zfill(2)+".json",
+                print "{:.2f}"."{:.2f}".
+                
+                with open("problems/"+ str(n).zfill(4)+"_"+"{:.3f}".format(c / n)+"_"+str(int(c)).zfill(2)+"_"+str(r).zfill(2)+".json", "w") as f:
+                    print n,  c, list(seq).index(c,) r
+                    p = ran_3sat(c, n)
+                    # print sorted(p.keys(), key = lambda x : x[1])
+                    p = {str(k): v for k, v in p.iteritems()}
+                    json.dump(p, f)
 
     # with open("problems/problems.json", "r") as f:
     #     q = json.load(f)
