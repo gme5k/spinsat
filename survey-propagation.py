@@ -1,5 +1,6 @@
 import json
 import ast
+import csv
 import sys
 import os
 import itertools
@@ -104,7 +105,8 @@ def sid(clauses, variables, precision, t_max):
                 if c.checkSAT() == 0:
                     c_sat +=1
             end = time.clock()
-            return c_sat, end - start
+           
+            return  len(variables), len(clauses), c_sat, end - start
         
 
         else:
@@ -196,7 +198,7 @@ def sid(clauses, variables, precision, t_max):
                         if c.checkSAT() == 0:
                             c_sat +=1
                     end = time.clock()
-                    return  c_sat, end - start
+                    return len(variables), len(clauses), c_sat, end - start
                 
             for var in variables:
                 if var.val == None:
@@ -208,7 +210,7 @@ def sid(clauses, variables, precision, t_max):
             # plotGraph(og_clauses,  variables, str(cycle), {})
             print 'n unfixed vars', len(vars_unfix)
             print 'n unsat clauses', len(clauses_unsat)
-           
+       
         cycle +=1
     # plotGraph(clauses, variables, 'fin', messages)
     # print 'SAT'
@@ -228,7 +230,7 @@ def sid(clauses, variables, precision, t_max):
         if c.checkSAT() == 0:
             c_sat +=1
     end = time.clock()
-    return c_sat, end - start
+    return len(variables), len(clauses), c_sat, end - start
 
                               
 def check_contra(var , messages):
@@ -273,7 +275,7 @@ def sur_prop(clauses, t_max, precision):
     
     while t < t_max:
         random.shuffle(edges)
-        print  '\nt = ', t
+        # print  '\nt = ', t
         
         for edge in edges:
             i = edge[1]
@@ -493,40 +495,46 @@ def store_unsat(og_clauses, v, unsatisfiers, clauses_sat):
 def sim_an(clauses, variables, t_max):
    
     start = time.clock()
-    print 'start', start
+    # print 'start', start
     t = start
-    s_max = float(len(clauses))
-    start_score = s_max - float(sum(c.checkSAT() for c in clauses)) / 2
-    print 's_max', s_max
+    s_max = len(clauses)
+    start_score = s_max - (sum(c.checkSAT() for c in clauses) / 2.)
+    # print 's_max', s_max
     
     for v in variables:
         v.val =  random.randrange(-1, 2, 2)
-    score = float(sum(c.checkSAT() for c in clauses)) / 2
+    score = sum(c.checkSAT() for c in clauses) / 2.
+    hi_score = score
     cur_state = {v : v.val for v in variables}
-    # tx = [0]
-    # sx = [score]
    
     while score > 0:
         # tx.append(t)
         # sx.append(score)
         ran_v = random.choice(list(variables))
         ran_v.val *= -1
-        new_score = float(sum(c.checkSAT() for c in clauses)) / 2
+        new_score = sum(c.checkSAT() for c in clauses) / 2.
         a_T = -1
         b_T = t_max
         T = lin_eq(t, a_T, b_T)
         x = new_score - score
         P = prob(x, t_max, t, T)
         ran = random.random()
-        
+    
         if  ran <=P:
             # if x > 0:
                 # print 'P', P
                 # print ran, '<=', P, 't', t, 'new score', new_score, 'T', T 
             # print 'cur_state', sorted([(i.name, cur_state[i])\
             #                            for i in cur_state], key=lambda x: x[0])
+
+            
             score = new_score
             cur_state = {v : v.val for v in variables}
+
+            if score < hi_score:
+                hi_score = score
+
+            
             # print 'new_state', sorted([(i.name, cur_state[i])\
             #                            for i in cur_state], key=lambda x: x[0])
             
@@ -536,11 +544,12 @@ def sim_an(clauses, variables, t_max):
         # print 't', t - start, 'tmax', t_max
         if t - start > t_max:
             end = time.clock()
-            return s_max - score, end - start, start_score
+            
+            return len(variables), len(clauses), s_max - hi_score, end - start, start_score
             # return tx, sx, score, sorted([(i.name, cur_state[i]) for i in cur_state], key=lambda x: x[0])
     # return tx, sx, sorted([(i.name, cur_state[i]) for i in cur_state], key=lambda x: x[0])
     end = time.clock()
-    return s_max - score, end-start, start_score
+    return len(variables), len(clauses), s_max - hi_score, end - start, start_score
 def revert_state(state, variables):
     for v in variables:
         v.val = state[v]
@@ -550,8 +559,8 @@ def prob(x,  t_max, t, T):
     if x > 0:
         n = 2 / abs(x)
         P = (T / (2 * t_max)) * n
-        if x == 1:
-            print P
+        # if x == 1:
+            # print P
        
         
     elif x < 0:
@@ -851,24 +860,7 @@ def a_seq(base, lo, up, step):
     return np.arange(base * lo, base * up, base * (up - lo) / step)
 
 
-
-
-def experiment(n, start, end):
-    todo = []
-    a_range =  np.arange(3.400, 4.624, 0.024)
-    
-    selection = {"{:.3f}".format(i) for i in a_range[start:end]}
-    print 'selection', selection
-    
-    path = "./problems/"
-    c = 0
-    for i in os.listdir("./problems/"):
         
-        if i[:4] == n and i[10:15] in selection:
-            todo.append(i)
-    todo.sort()
-    for j in todo:
-        print j
 
       
             # if i in selection:
@@ -906,9 +898,52 @@ def experiment(n, start, end):
     # print results   
 
 
-
+def get_problems(n, start, end):
+    todo = []
+    a_range =  np.arange(3.400, 4.624, 0.024)
+    
+    selection = {"{:.3f}".format(i) for i in a_range[start:end]}
+    print 'selection', selection, 'len(selection)', len(selection)
+    path = "./problems/"
+    c = 0
+    for i in os.listdir("./problems/"):
+        
+        if i[:4] == n and i[10:15] in selection:
+            todo.append(i)
+    todo.sort()
+    for j in todo:
+        print j
+    print 'n  problems', len(todo)
+    return todo
+    
 if __name__== "__main__":
-    print experiment('0125', 0,4)
+    todo = get_problems("0125", 0, 1)
+    with open('data.csv', 'w') as fo:
+        cw=csv.writer(fo, delimiter=';')
+        cw.writerow(['prob', 'c', 'v','n','t', 'c', 'v', 'n', 't' 'start'])
+        c = 0
+        for p in todo:
+            with open("./problems/" + p, "r") as fi:
+                r = [p]
+                j = json.load(fi)
+                interpreted = {ast.literal_eval(k): v for k, v in j.iteritems()}
+                j = sat_loader(interpreted)
+                t_max = 1000.
+                precision = 0.001
+                r.append(sid(j[0], j[1], precision, t_max))
+                
+                t_sim = 12.
+                j = sat_loader(interpreted)
+                r.append(sim_an(j[0], j[1], t_sim))
+                
+                cw.writerow(r)
+               
+                c+=1
+                if c == 3:
+                    break
+            
+
+   
 
     
 
