@@ -2,6 +2,7 @@ import json
 import ast
 import csv
 import sys
+import multiprocessing
 import os
 import itertools
 import random
@@ -14,6 +15,7 @@ import numpy as np
 import time
 import graphviz
 import copy
+import datetime
 import time
 sys.setrecursionlimit(100000)
 
@@ -22,7 +24,6 @@ sys.setrecursionlimit(100000)
 def sid(clauses, variables, precision, t_max):
     start = time.clock()
     cycle = 0
-    print 'cycle', cycle
     # og_clauses = copy.deepcopy(clauses)
 
     # # connect og_clauses with variables
@@ -52,7 +53,7 @@ def sid(clauses, variables, precision, t_max):
     # keep track of unfixed vars and unsat clauses
     vars_unfix = set()
     clauses_unsat = set()
-    print 'copy done'
+    # print 'copy done'
     for v in variables:
         vars_unfix.add(v)
 
@@ -96,7 +97,7 @@ def sid(clauses, variables, precision, t_max):
         #     for c in v.clauses:
         #         print '    c', c.name, c.checkSAT()
                        
-        messages =  sur_prop(clauses_unsat, t_max, precision)
+        messages =  sur_prop(clauses_unsat, start, t_max, precision)
         # plotGraph(og_clauses, variables, str(cycle), messages) 
         if messages == 'UNCONVERGED':
             print 'UNCONVERGED'
@@ -167,7 +168,7 @@ def sid(clauses, variables, precision, t_max):
                     variance.append((i, w_plus, w_min))
                 # max_var = max(variance, key = lambda x : abs(x[1] - x[2]))
                 variance.sort(key = lambda x: abs(x[1] - x[2]), reverse = True)
-                n_fix = ceildiv(len(vars_unfix) , 20)
+                n_fix = ceildiv(len(vars_unfix) , 25)
                 for max_var in variance[:n_fix]:
                 # print 'variance sorted'
                               
@@ -190,7 +191,7 @@ def sid(clauses, variables, precision, t_max):
 
             # for c in clauses
             for v in vars_unfix:
-                if check_contra(v, messages):
+                if check_contra(v, messages, precision):
                     c_sat = 0
                     
                     for c in clauses:
@@ -233,7 +234,7 @@ def sid(clauses, variables, precision, t_max):
     return len(variables), len(clauses), c_sat, end - start
 
                               
-def check_contra(var , messages):
+def check_contra(var , messages, precision):
     # print 'check_contra'
     # print 'v', var.name
     clause_list = list(var.clauses)
@@ -249,12 +250,12 @@ def check_contra(var , messages):
    
                 
            
-def sur_prop(clauses, t_max, precision):
+def sur_prop(clauses, start, t_max, precision):
 
     # clauses = clauses_unsat
     messages = {}
     oldMessages = {}
-    t = 0
+    t = time.clock() - start
    
     # generate random messages u_a -> i, messages from clauses to variables
     for a in clauses:
@@ -267,8 +268,8 @@ def sur_prop(clauses, t_max, precision):
     #     print "c_"+str(message[0].name), "v_"+str(message[1].name), messages[message]
 
     edges = messages.keys()
-    print 'len(edges)', len(edges)
-    t += 1
+    # print 'len(edges)', len(edges)
+    # t += 1
     
     # while t < t_max, iterate over every edge in a random fashion and update
     # warnings sequntially using the sp_update routine
@@ -311,14 +312,17 @@ def sur_prop(clauses, t_max, precision):
         # print 't', t
         
         # if converged return warnings
+        t = time.clock() - start
         if convergence == True:
             print '\nconverged in  t = ', t
             return messages
-
+        
+       
         # if not, and time is up, return uncovnerged
-        elif t == t_max - 1:
+        elif t >= t_max:
             return 'UNCONVERGED'
-        t += 1       
+       
+        
         
 def sp_update(messages, a, i):
     # print 'a, i', a.name, i.name
@@ -496,9 +500,9 @@ def sim_an(clauses, variables, t_max):
    
     start = time.clock()
     # print 'start', start
-    t = start
+    t = time.clock() - start
     s_max = len(clauses)
-    start_score = s_max - (sum(c.checkSAT() for c in clauses) / 2.)
+    # start_score = s_max - (sum(c.checkSAT() for c in clauses) / 2.)
     # print 's_max', s_max
     
     for v in variables:
@@ -518,6 +522,7 @@ def sim_an(clauses, variables, t_max):
         T = lin_eq(t, a_T, b_T)
         x = new_score - score
         P = prob(x, t_max, t, T)
+      
         ran = random.random()
     
         if  ran <=P:
@@ -527,12 +532,14 @@ def sim_an(clauses, variables, t_max):
             # print 'cur_state', sorted([(i.name, cur_state[i])\
             #                            for i in cur_state], key=lambda x: x[0])
 
-            
+        
             score = new_score
+            
             cur_state = {v : v.val for v in variables}
 
             if score < hi_score:
                 hi_score = score
+                print s_max - hi_score, s_max
 
             
             # print 'new_state', sorted([(i.name, cur_state[i])\
@@ -540,12 +547,12 @@ def sim_an(clauses, variables, t_max):
             
         else:
             revert_state(cur_state, variables)
-        t = time.clock()
+        t = time.clock() - start
         # print 't', t - start, 'tmax', t_max
-        if t - start > t_max:
+        if t > t_max:
             end = time.clock()
             
-            return len(variables), len(clauses), s_max - hi_score, end - start, start_score
+            return len(variables), len(clauses), s_max - hi_score, end - start
             # return tx, sx, score, sorted([(i.name, cur_state[i]) for i in cur_state], key=lambda x: x[0])
     # return tx, sx, sorted([(i.name, cur_state[i]) for i in cur_state], key=lambda x: x[0])
     end = time.clock()
@@ -559,8 +566,6 @@ def prob(x,  t_max, t, T):
     if x > 0:
         n = 2 / abs(x)
         P = (T / (2 * t_max)) * n
-        # if x == 1:
-            # print P
        
         
     elif x < 0:
@@ -895,13 +900,14 @@ def a_seq(base, lo, up, step):
     # simres = sim_an(p_copy[0], p_copy[1], t_sim)
     # results.append(', simres:'+str(simres))
         
-    # print results   
+    # print results   s
 
 
 def get_problems(n, start, end):
     todo = []
     a_range =  np.arange(3.400, 4.624, 0.024)
-    
+    print [type(i) for i in a_range]
+    print 'ajbrgb',
     selection = {"{:.3f}".format(i) for i in a_range[start:end]}
     print 'selection', selection, 'len(selection)', len(selection)
     path = "./problems/"
@@ -911,36 +917,73 @@ def get_problems(n, start, end):
         if i[:4] == n and i[10:15] in selection:
             todo.append(i)
     todo.sort()
-    for j in todo:
-        print j
+    # for j in todo:
+    #     print j
     print 'n  problems', len(todo)
     return todo
+
+
+
+
+
+
     
-if __name__== "__main__":
-    todo = get_problems("0125", 0, 1)
-    with open('data.csv', 'w') as fo:
+  
+
+
+
+
+def exe_algs(part, t_max, precision):
+    save_str =  part[0][0:4] + '_' +  part[0][10:15] + '_' + part[0][16:18]\
+                + '-' + part[len(part) - 1][0:4] + '_' +\
+                part[len(part) - 1][10:15] + '_' + part[len(part) - 1][16:18]
+    
+    with open("./data/new/2"+save_str+".csv", 'w') as fo:
         cw=csv.writer(fo, delimiter=';')
-        cw.writerow(['prob', 'c', 'v','n','t', 'c', 'v', 'n', 't' 'start'])
-        c = 0
-        for p in todo:
+        cw.writerow(['prob', 'c_sid', 'v_sid','n_solved_sid',
+                     't_solve_sid', 'c_sim', 'v_sim', 'n_solved_sim', 't_solve_sim'])
+        for p in part:
             with open("./problems/" + p, "r") as fi:
                 r = [p]
                 j = json.load(fi)
                 interpreted = {ast.literal_eval(k): v for k, v in j.iteritems()}
                 j = sat_loader(interpreted)
-                t_max = 1000.
-                precision = 0.001
-                r.append(sid(j[0], j[1], precision, t_max))
-                
-                t_sim = 12.
+                # t_max = 500
+                # precision = 0.001
+                sid_res = sid(j[0], j[1], precision, t_max)
+                r.extend(sid_res)
+                t_sim = sid_res[3]
                 j = sat_loader(interpreted)
-                r.append(sim_an(j[0], j[1], t_sim))
-                
+                sim_res=sim_an(j[0], j[1], t_sim)
+                r.extend(sim_res)
                 cw.writerow(r)
-               
-                c+=1
-                if c == 3:
-                    break
+
+
+
+
+def main(n, start, end, t_max, precision):
+    jobs =[]
+    todo = get_problems(str(n).zfill(4), start, end)
+
+    # print todo
+    split = np.array_split(todo, 4)
+
+    for part in split:
+        proc = multiprocessing.Process(target=exe_algs, args=(part, t_max, precision,))
+        jobs.append(proc)
+        proc.start()
+        
+    for proc in jobs:
+        proc.join()
+
+    
+       
+if __name__== "__main__":
+    main(125, 0, 1, 500, 0.001)
+
+
+
+
             
 
    
