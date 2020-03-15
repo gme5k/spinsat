@@ -21,7 +21,7 @@ sys.setrecursionlimit(100000)
 
 # cavFieldsG = {}
 
-def sid(clauses, variables, precision, t_max):
+def sid(clauses, variables, precision, t_max, frac):
     start = time.clock()
     cycle = 0
     # og_clauses = copy.deepcopy(clauses)
@@ -72,7 +72,7 @@ def sid(clauses, variables, precision, t_max):
             
         #     for v in ogc.vars:
         #         print '    v', v.name, v.val
-        print '\ncycle', cycle
+        # print '\ncycle', cycle
         # print '\nog_clauses'
         # print sorted([(c.name, sorted([(v.name, c.getEdge(v)) for v in c.vars])) for c in og_clauses])
         # print '\nunsat clauses'
@@ -100,14 +100,14 @@ def sid(clauses, variables, precision, t_max):
         messages =  sur_prop(clauses_unsat, start, t_max, precision)
         # plotGraph(og_clauses, variables, str(cycle), messages) 
         if messages == 'UNCONVERGED':
-            print 'UNCONVERGED'
+            # print 'UNCONVERGED'
             c_sat = 0
             for c in clauses:
                 if c.checkSAT() == 0:
                     c_sat +=1
             end = time.clock()
            
-            return  len(variables), len(clauses), c_sat, end - start
+            return  len(variables), len(clauses), c_sat, end - start, 'unconverged', {v.name: v.val for v in variables}
         
 
         else:
@@ -168,7 +168,7 @@ def sid(clauses, variables, precision, t_max):
                     variance.append((i, w_plus, w_min))
                 # max_var = max(variance, key = lambda x : abs(x[1] - x[2]))
                 variance.sort(key = lambda x: abs(x[1] - x[2]), reverse = True)
-                n_fix = ceildiv(len(vars_unfix) , 25)
+                n_fix = ceildiv(len(vars_unfix) , frac)
                 for max_var in variance[:n_fix]:
                 # print 'variance sorted'
                               
@@ -199,7 +199,7 @@ def sid(clauses, variables, precision, t_max):
                         if c.checkSAT() == 0:
                             c_sat +=1
                     end = time.clock()
-                    return len(variables), len(clauses), c_sat, end - start
+                    return len(variables), len(clauses), c_sat, end - start, 'contradiction',  {v.name: v.val for v in variables}
                 
             for var in variables:
                 if var.val == None:
@@ -209,8 +209,8 @@ def sid(clauses, variables, precision, t_max):
                 if c.checkSAT() == 2:
                     clauses_unsat.add(c)
             # plotGraph(og_clauses,  variables, str(cycle), {})
-            print 'n unfixed vars', len(vars_unfix)
-            print 'n unsat clauses', len(clauses_unsat)
+            # print 'n unfixed vars', len(vars_unfix)
+            # print 'n unsat clauses', len(clauses_unsat)
        
         cycle +=1
     # plotGraph(clauses, variables, 'fin', messages)
@@ -225,13 +225,13 @@ def sid(clauses, variables, precision, t_max):
 
     #     for c in v.clauses:
     #         print '    c', c.name, c.checkSAT(), c.getEdge(v)
-    print "SATISFIED"
+    # print "SATISFIED"
     c_sat = 0
     for c in clauses:
         if c.checkSAT() == 0:
             c_sat +=1
     end = time.clock()
-    return len(variables), len(clauses), c_sat, end - start
+    return len(variables), len(clauses), c_sat, end - start, 'succesful', {v.name: v.val for v in variables}
 
                               
 def check_contra(var , messages, precision):
@@ -255,7 +255,7 @@ def sur_prop(clauses, start, t_max, precision):
     # clauses = clauses_unsat
     messages = {}
     oldMessages = {}
-    t = time.clock() - start
+    t = 0
    
     # generate random messages u_a -> i, messages from clauses to variables
     for a in clauses:
@@ -269,12 +269,12 @@ def sur_prop(clauses, start, t_max, precision):
 
     edges = messages.keys()
     # print 'len(edges)', len(edges)
-    # t += 1
+    t += 1
     
     # while t < t_max, iterate over every edge in a random fashion and update
     # warnings sequntially using the sp_update routine
     
-    while t < t_max:
+    while t <= t_max:
         random.shuffle(edges)
         # print  '\nt = ', t
         
@@ -312,16 +312,16 @@ def sur_prop(clauses, start, t_max, precision):
         # print 't', t
         
         # if converged return warnings
-        t = time.clock() - start
+        
         if convergence == True:
-            print '\nconverged in  t = ', t
+            # print '\nconverged in  t = ', t
             return messages
         
        
         # if not, and time is up, return uncovnerged
-        elif t >= t_max:
+        elif t == t_max:
             return 'UNCONVERGED'
-       
+        t += 1
         
         
 def sp_update(messages, a, i):
@@ -509,7 +509,7 @@ def sim_an(clauses, variables, t_max):
         v.val =  random.randrange(-1, 2, 2)
     score = sum(c.checkSAT() for c in clauses) / 2.
     hi_score = score
-    cur_state = {v : v.val for v in variables}
+    cur_state = {v: v.val for v in variables}
    
     while score > 0:
         # tx.append(t)
@@ -539,7 +539,7 @@ def sim_an(clauses, variables, t_max):
 
             if score < hi_score:
                 hi_score = score
-                print s_max - hi_score, s_max
+                # print s_max - hi_score, s_max
 
             
             # print 'new_state', sorted([(i.name, cur_state[i])\
@@ -549,14 +549,14 @@ def sim_an(clauses, variables, t_max):
             revert_state(cur_state, variables)
         t = time.clock() - start
         # print 't', t - start, 'tmax', t_max
-        if t > t_max:
+        if t >= t_max:
             end = time.clock()
             
-            return len(variables), len(clauses), s_max - hi_score, end - start
+            return len(variables), len(clauses), s_max - hi_score, end - start, 'unsuccesful', {v.name : v.val for v in cur_state}
             # return tx, sx, score, sorted([(i.name, cur_state[i]) for i in cur_state], key=lambda x: x[0])
     # return tx, sx, sorted([(i.name, cur_state[i]) for i in cur_state], key=lambda x: x[0])
     end = time.clock()
-    return len(variables), len(clauses), s_max - hi_score, end - start, start_score
+    return len(variables), len(clauses), s_max - hi_score, end - start, 'succesful', {v.name : v.val for v in cur_state}
 def revert_state(state, variables):
     for v in variables:
         v.val = state[v]
@@ -906,8 +906,6 @@ def a_seq(base, lo, up, step):
 def get_problems(n, start, end):
     todo = []
     a_range =  np.arange(3.400, 4.624, 0.024)
-    print [type(i) for i in a_range]
-    print 'ajbrgb',
     selection = {"{:.3f}".format(i) for i in a_range[start:end]}
     print 'selection', selection, 'len(selection)', len(selection)
     path = "./problems/"
@@ -933,35 +931,45 @@ def get_problems(n, start, end):
 
 
 
-def exe_algs(part, t_max, precision):
+def exe_algs(part, t_max, precision, frac):
+    print part
     save_str =  part[0][0:4] + '_' +  part[0][10:15] + '_' + part[0][16:18]\
-                + '-' + part[len(part) - 1][0:4] + '_' +\
-                part[len(part) - 1][10:15] + '_' + part[len(part) - 1][16:18]
+                + '--' + part[len(part) - 1][0:4] + '_' +\
+                part[len(part) - 1][10:15] + '_' + part[len(part) - 1][16:18] + '-' + str(frac).zfill(2)
     
-    with open("./data/new/2"+save_str+".csv", 'w') as fo:
+    with open(uniq_output("results/"+save_str), 'w') as fo:
         cw=csv.writer(fo, delimiter=';')
-        cw.writerow(['prob', 'c_sid', 'v_sid','n_solved_sid',
-                     't_solve_sid', 'c_sim', 'v_sim', 'n_solved_sim', 't_solve_sim'])
+        cw.writerow(['prob', 'n_v_sid', 'n_c_sid','n_c_solved_sid',
+                     't_solved_sid', 'result_sid', 'n_v_sim', 'n_c_sim', 'n_solved_sim', 't_solved_sim', 'result_sim'])
+        part_start = time.clock()
         for p in part:
+            print list(part).index(p), len(part) - 1
+            print p
             with open("./problems/" + p, "r") as fi:
                 r = [p]
                 j = json.load(fi)
                 interpreted = {ast.literal_eval(k): v for k, v in j.iteritems()}
                 j = sat_loader(interpreted)
-                # t_max = 500
-                # precision = 0.001
-                sid_res = sid(j[0], j[1], precision, t_max)
-                r.extend(sid_res)
+                sid_res = sid(j[0], j[1], precision, t_max, frac)
+                r.extend(sid_res[:-1])
+                with open("./results/solutions/" + "sid" + p, 'w') as sol:
+                    json.dump(sid_res[-1:], sol)
                 t_sim = sid_res[3]
                 j = sat_loader(interpreted)
                 sim_res=sim_an(j[0], j[1], t_sim)
-                r.extend(sim_res)
+                with open("./results/solutions/" + "sim" + p, 'w') as sol:
+                    json.dump(sim_res[-1:], sol)
+                r.extend(sim_res[:-1])
                 cw.writerow(r)
+        else:
+            part_end = time.clock()
+            cw.writerow([part_end - part_start])
 
 
 
 
-def main(n, start, end, t_max, precision):
+def main(n, start, end, t_max, precision, frac):
+    main_start = time.clock()
     jobs =[]
     todo = get_problems(str(n).zfill(4), start, end)
 
@@ -969,17 +977,43 @@ def main(n, start, end, t_max, precision):
     split = np.array_split(todo, 4)
 
     for part in split:
-        proc = multiprocessing.Process(target=exe_algs, args=(part, t_max, precision,))
+        proc = multiprocessing.Process(target=exe_algs, args=(part, t_max, precision, frac))
         jobs.append(proc)
         proc.start()
         
     for proc in jobs:
         proc.join()
+    main_end = time.clock()
+    
+    print main_end - main_start
 
     
-       
+def uniq_output(name):
+    if os.path.isfile('./' + name + '_' + '.csv'):
+        print './' + name + '_' + '.csv already exists, making new csv'
+        i = 1
+
+        # create unique fname
+        while os.path.isfile("{}{:s}.csv".format('./'+ name + '_',\
+                                                 '(' + str(i) + ')')):
+            i += 1
+        savename = "{}{:s}.csv".format('./'+ name + '_', '(' +\
+                                       str(i) + ')')
+                
+    else:
+        savename = './'+ name + '_' + '.csv'
+        print 'making ' + './'+ name + '_' + '.csv'
+        
+    return savename
+
 if __name__== "__main__":
-    main(125, 0, 1, 500, 0.001)
+    
+    main(1000, 34, 35, 1000, 0.001, 25)
+    main(1000, 34, 35, 1000, 0.001, 50)
+    main(1000, 0, 1, 1000, 0.001, 25)
+    main(1000, 0, 1, 1000, 0.001, 50)
+    main(250, 30, 31, 1000, 0.001, 25)
+    main(250, 30, 31, 1000, 0.001, 50)
 
 
 
