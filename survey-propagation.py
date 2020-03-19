@@ -23,6 +23,7 @@ sys.setrecursionlimit(100000)
 
 def sid(clauses, variables, precision, t_max, frac):
     start = time.clock()
+    iters = 0
     cycle = 0
     # og_clauses = copy.deepcopy(clauses)
 
@@ -96,8 +97,9 @@ def sid(clauses, variables, precision, t_max, frac):
             
         #     for c in v.clauses:
         #         print '    c', c.name, c.checkSAT()
-                       
-        messages =  sur_prop(clauses_unsat, start, t_max, precision)
+        prop_res= sur_prop(clauses_unsat, start, t_max, precision)
+        messages =  prop_res[0]
+        iters += prop_res[1]
         # plotGraph(og_clauses, variables, str(cycle), messages) 
         if messages == 'UNCONVERGED':
             # print 'UNCONVERGED'
@@ -107,7 +109,7 @@ def sid(clauses, variables, precision, t_max, frac):
                     c_sat +=1
             end = time.clock()
            
-            return  len(variables), len(clauses), c_sat, end - start, 'unconverged', {v.name: v.val for v in variables}
+            return  len(variables), len(clauses), c_sat, end - start, iters, 'unconverged', {v.name: v.val for v in variables}
         
 
         else:
@@ -186,6 +188,14 @@ def sid(clauses, variables, precision, t_max, frac):
             
             else:
                 print 'should walk_sat'
+                c_sat = 0
+                for c in clauses:                        
+                    if c.checkSAT() == 0:
+                        c_sat +=1
+                end = time.clock()                    
+                return len(variables), len(clauses), c_sat, end - start, iters,\
+                'out of vars',  {v.name: v.val for v in variables}
+                
                 # walk_sat(og_clauses, clauses, clauses_unsat, variables, vars_unfix)
             decimate(clauses_unsat, vars_unfix)
 
@@ -199,7 +209,7 @@ def sid(clauses, variables, precision, t_max, frac):
                         if c.checkSAT() == 0:
                             c_sat +=1
                     end = time.clock()
-                    return len(variables), len(clauses), c_sat, end - start, 'contradiction',  {v.name: v.val for v in variables}
+                    return len(variables), len(clauses), c_sat, end - start, iters, 'contradiction',  {v.name: v.val for v in variables}
                 
             for var in variables:
                 if var.val == None:
@@ -231,7 +241,7 @@ def sid(clauses, variables, precision, t_max, frac):
         if c.checkSAT() == 0:
             c_sat +=1
     end = time.clock()
-    return len(variables), len(clauses), c_sat, end - start, 'succesful', {v.name: v.val for v in variables}
+    return len(variables), len(clauses), c_sat, end - start, iters, 'succesful', {v.name: v.val for v in variables}
 
                               
 def check_contra(var , messages, precision):
@@ -315,12 +325,12 @@ def sur_prop(clauses, start, t_max, precision):
         
         if convergence == True:
             # print '\nconverged in  t = ', t
-            return messages
+            return messages, t
         
        
         # if not, and time is up, return uncovnerged
         elif t == t_max:
-            return 'UNCONVERGED'
+            return 'UNCONVERGED',t
         t += 1
         
         
@@ -904,43 +914,33 @@ def a_seq(base, lo, up, step):
 
 
 def get_problems(n, start, end):
-    todo = []
+    todo = {}
     a_range =  np.arange(3.400, 4.624, 0.024)
-    selection = {"{:.3f}".format(i) for i in a_range[start:end]}
+    selection = ["{:.3f}".format(i) for i in a_range[start:end]]
     print 'selection', selection, 'len(selection)', len(selection)
     path = "./problems/"
     c = 0
-    for i in os.listdir("./problems/"):
+    
+    for s in selection:
+        todo[s] = []
         
-        if i[:4] == n and i[10:15] in selection:
-            todo.append(i)
-    todo.sort()
-    # for j in todo:
-    #     print j
-    print 'n  problems', len(todo)
+        for i in os.listdir("./problems/"):
+            if i[:4] == n and i[10:15] in s:
+                todo[s].append(i)
+        else:
+            todo[s].sort()    
+
     return todo
 
 
-
-
-
-
-    
-  
-
-
-
-
 def exe_algs(part, t_max, precision, frac):
-    print part
     save_str =  part[0][0:4] + '_' +  part[0][10:15] + '_' + part[0][16:18]\
-                + '--' + part[len(part) - 1][0:4] + '_' +\
-                part[len(part) - 1][10:15] + '_' + part[len(part) - 1][16:18] + '-' + str(frac).zfill(2)
+                + '--'  + part[len(part) - 1][10:15] + '_' + part[len(part) - 1][16:18]
     
-    with open(uniq_output("results/"+save_str), 'w') as fo:
-        cw=csv.writer(fo, delimiter=';')
+    with open(uniq_output("results/18-03/"+str(frac)+"/"+save_str), 'w') as fo:
+        cw = csv.writer(fo, delimiter=';')
         cw.writerow(['prob', 'n_v_sid', 'n_c_sid','n_c_solved_sid',
-                     't_solved_sid', 'result_sid', 'n_v_sim', 'n_c_sim', 'n_solved_sim', 't_solved_sim', 'result_sim'])
+                     't_solved_sid', 'sur_prop_iters',  'result_sid', 'n_v_sim', 'n_c_sim', 'n_solved_sim', 't_solved_sim', 'result_sim'])
         part_start = time.clock()
         for p in part:
             print list(part).index(p), len(part) - 1
@@ -969,52 +969,48 @@ def exe_algs(part, t_max, precision, frac):
 
 
 def main(n, start, end, t_max, precision, frac):
-    main_start = time.clock()
     jobs =[]
     todo = get_problems(str(n).zfill(4), start, end)
+    for a in sorted(todo.keys()):
+        print a
+        print todo[a]
 
-    # print todo
-    split = np.array_split(todo, 4)
+  
+        split = np.array_split(todo[a], 4)
 
-    for part in split:
-        proc = multiprocessing.Process(target=exe_algs, args=(part, t_max, precision, frac))
-        jobs.append(proc)
-        proc.start()
-        
-    for proc in jobs:
-        proc.join()
-    main_end = time.clock()
+        for part in split:
+            proc = multiprocessing.Process(target=exe_algs, args=(part, t_max, precision, frac,))
+            jobs.append(proc)
+            proc.start()
+
+        for proc in jobs:
+            proc.join()
+
     
-    print main_end - main_start
+   
 
     
 def uniq_output(name):
-    if os.path.isfile('./' + name + '_' + '.csv'):
-        print './' + name + '_' + '.csv already exists, making new csv'
+    if os.path.isfile('./' + name +  '.csv'):
+        print './' + name +  '.csv already exists, making new csv'
         i = 1
 
         # create unique fname
-        while os.path.isfile("{}{:s}.csv".format('./'+ name + '_',\
+        while os.path.isfile("{}{:s}.csv".format('./'+ name ,\
                                                  '(' + str(i) + ')')):
             i += 1
-        savename = "{}{:s}.csv".format('./'+ name + '_', '(' +\
+        savename = "{}{:s}.csv".format('./'+ name, '(' +\
                                        str(i) + ')')
-                
+        print 'saving as',  savename 
     else:
-        savename = './'+ name + '_' + '.csv'
-        print 'making ' + './'+ name + '_' + '.csv'
+        savename = './'+ name + '.csv'
+        print 'saving as', './'+ name +  '.csv'
         
     return savename
 
 if __name__== "__main__":
-    
-    main(1000, 34, 35, 1000, 0.001, 25)
-    main(1000, 34, 35, 1000, 0.001, 50)
-    main(1000, 0, 1, 1000, 0.001, 25)
-    main(1000, 0, 1, 1000, 0.001, 50)
-    main(250, 30, 31, 1000, 0.001, 25)
-    main(250, 30, 31, 1000, 0.001, 50)
-
+    main(125, 0, 10, 1000, 0.001, 50)
+   
 
 
 
