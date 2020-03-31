@@ -1009,7 +1009,7 @@ def uniq_output(name):
     return savename
 
 if __name__== "__main__":
-    main(125, 0, 10, 1000, 0.001, 50)
+    main(125, 43, 51, 1000, 0.001, 50)
    
 
 
