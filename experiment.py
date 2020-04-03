@@ -520,6 +520,7 @@ def sim_an(clauses, variables, t_max):
     score = sum(c.checkSAT() for c in clauses) / 2.
     hi_score = score
     cur_state = {v: v.val for v in variables}
+    best_state = cur_state
    
     while score > 0:
         # tx.append(t)
@@ -549,6 +550,7 @@ def sim_an(clauses, variables, t_max):
 
             if score < hi_score:
                 hi_score = score
+                best_state = cur_state
                 # print s_max - hi_score, s_max
 
             
@@ -562,15 +564,17 @@ def sim_an(clauses, variables, t_max):
         if t >= t_max:
             end = time.clock()
             
-            return len(variables), len(clauses), s_max - hi_score, end - start, 'unsuccesful', {v.name : v.val for v in cur_state}
+            return len(variables), len(clauses), s_max - hi_score, end - start, 'unsuccesful', {v.name : v.val for v in best_state}
             # return tx, sx, score, sorted([(i.name, cur_state[i]) for i in cur_state], key=lambda x: x[0])
     # return tx, sx, sorted([(i.name, cur_state[i]) for i in cur_state], key=lambda x: x[0])
     end = time.clock()
-    return len(variables), len(clauses), s_max - hi_score, end - start, 'succesful', {v.name : v.val for v in cur_state}
+    return len(variables), len(clauses), s_max - hi_score, end - start, 'succesful', {v.name : v.val for v in best_state}
+
 def revert_state(state, variables):
     for v in variables:
         v.val = state[v]
 
+        
 def prob(x,  t_max, t, T):
    
     if x > 0:
@@ -879,7 +883,7 @@ def a_seq(base, lo, up, step):
 
       
             # if i in selection:
-            #     print 'in'
+            #     print 'in'ss
             # else:
             #     print 'out'
             # if str(i)[10:15] in selection:
@@ -956,7 +960,7 @@ def exe_algs(part, t_max, precision, frac):
             
             print list(part).index(p), len(part) - 1
             print p
-            if not os.path.isfile("./results/solutions/" + "sid" + p):
+            if not os.path.isfile("./results/solutions/" + "sim" + p):
                 with open("./problems/" + p, "r") as fi:
                     r = [p]
                     j = json.load(fi)
@@ -1000,7 +1004,31 @@ def main(n, start, end, t_max, precision, frac):
         for proc in jobs:
             proc.join()
 
+def batch_check_score():
+    solpath =  "./results/solutions/"
+    path = "./problems/"
     
+    for f  in [f for f in os.listdir(path) if os.path.isfile(path+f)]:
+        for g in [g for g in os.listdir(solpath) if os.path.isfile(solpath+g)]:
+            if g[3:] == f and g[:3] == 'sim':
+                print f, g
+                
+                with open(path + f, "r") as p:
+                    print p
+                    pj = json.load(p)
+                    # print pj
+                    pj_interpreted = {ast.literal_eval(k): v for k, v in pj.iteritems()}
+                    clauses, variables = sat_loader(pj_interpreted)
+                    
+                    with open(solpath + g, 'r') as s:
+                        sj = json.load(s)[0]
+                        state = {ast.literal_eval(a) : sj.get(a) for a in sj}
+                        for v in variables:
+                            v.val = state[v.name]
+                        score = len(clauses) - sum(c.checkSAT() for c in clauses) / 2.
+                        print score
+                    
+                        
    
 
     
@@ -1023,7 +1051,8 @@ def uniq_output(name):
     return savename
 
 if __name__== "__main__":
-    main(125, 44, 51, 1000, 0.001, 50)
+    # batch_check_score()
+    main(125, 0, 51, 1000, 0.001, 50)
    
 
 
